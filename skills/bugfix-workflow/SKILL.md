@@ -9,198 +9,83 @@ metadata:
 
 ## Bugfix Workflow: Reproduce → Test → Fix → Verify
 
-Core philosophy: **reproduce before you fix, verify after you fix, link everything to the ticket.**
+**Core philosophy:** reproduce before you fix, verify after you fix, link
+everything to the ticket.
 
-## Workflow
+## The seven steps
 
 ```
-Step 1: Read & Understand the Bug
-         ↓
-Step 2: Reproduce
-         ↓
-Step 3: Write a Failing Test
-         ↓
-Step 4: Root Cause Analysis
-         ↓
-Step 5: Implement the Fix
-         ↓
-Step 6: Verify (tests pass)
-         ↓
-Step 7: Document on Ticket
+1. Read & understand the bug
+2. Reproduce
+3. Write a failing test
+4. Root cause analysis
+5. Implement the fix
+6. Verify
+7. Document on ticket
 ```
 
-## Step 1: Read & Understand the Bug
+### 1. Read & understand the bug
 
-**Goal:** Fully understand the issue before touching code.
+`gh issue view <N>`. Identify expected vs actual behavior, files involved,
+error messages, stack traces, related issues. Post a `🔧 **Investigating**`
+comment on the ticket so the reporter knows work has started.
 
-```bash
-gh issue view <NUMBER>
-```
+### 2. Reproduce
 
-Read all comments. Identify:
-- Expected behavior vs actual behavior
-- Which files/modules are involved
-- Any error messages, stack traces, screenshots
-- Related or duplicate issues
+Confirm the bug exists and understand the exact conditions that trigger it.
+UI bugs → Playwright MCP snapshots. API bugs → `curl`. Logic bugs → minimal
+reproducer script.
 
-**Comment on ticket:**
-```bash
-gh issue comment <NUMBER> --body "🔧 **Investigating**: Reading the report and reproducing."
-```
+**If you cannot reproduce, stop and ask.** Do not proceed to fix a bug you
+cannot observe. Post what you tried and request more details.
 
-## Step 2: Reproduce
+Once reproduced, post a `✅ **Reproduced**` comment with steps, expected,
+actual, and frequency (always / intermittent).
 
-**Goal:** Confirm the bug exists and understand exact conditions.
+### 3. Write a failing test
 
-### For UI Bugs (Playwright MCP)
-```
-browser_navigate → browser_snapshot → follow reported steps →
-browser_console_messages → browser_network_requests → browser_take_screenshot
-```
+Capture the bug as a regression test *before* fixing. Run it and confirm it
+fails — that's the whole point. A passing test for an unfixed bug means the
+test doesn't exercise the bug.
 
-### For API Bugs
-```bash
-curl -s -X POST http://localhost:PORT/api/endpoint \
-  -H "Content-Type: application/json" \
-  -d '{"test": "data"}' | jq .
-```
+### 4. Root cause analysis
 
-### For Logic Bugs
-Write a minimal script that triggers the issue:
-```python
-# reproduce_issue_NNN.py
-from module import function
-result = function(edge_case_input)
-print(f"Expected: X, Got: {result}")
-```
+Locate the code, trace execution from entry point to failure, classify the
+cause (logic / data / concurrency / config / integration), and assess blast
+radius — what else uses this code, could the fix break anything else?
 
-**If you cannot reproduce:** Comment on ticket with what you tried and ask for more details. Do NOT proceed to fix.
+Post a `🔍 **Root Cause**` comment with location (file:line), cause, impact,
+and fix approach.
 
-**Comment on ticket:**
-```bash
-gh issue comment <NUMBER> --body "$(cat <<'EOF'
-✅ **Reproduced**
+### 5. Implement the fix
 
-**Steps:** [exact steps]
-**Expected:** [what should happen]
-**Actual:** [what happens]
-**Frequency:** Always / Intermittent
-EOF
-)"
-```
+Minimal, focused. Fix the root cause — **only** the root cause. Don't refactor
+neighboring code, don't clean up unrelated style, don't expand scope. A bug
+fix is not the place for improvements.
 
-## Step 3: Write a Failing Test
+### 6. Verify
 
-**Goal:** Capture the bug as a test BEFORE fixing it. The test must fail now and pass after the fix.
+The failing test from step 3 now passes. Full test suite still passes. Lint
+and type checks clean. If anything fails, fix it before proceeding — don't
+ship a fix that breaks something else.
 
-```python
-def test_issue_NNN_description():
-    """Regression test for #NNN: [bug title]."""
-    # Arrange — set up the conditions that trigger the bug
-    input_data = edge_case_input
+### 7. Document on ticket
 
-    # Act — trigger the bug
-    result = function(input_data)
+Post a `✅ **Fixed**` comment with root cause summary, what changed, regression
+test name, and PR number. Commit and open the PR. The `task-completion` skill
+covers the full commit → PR → notify handoff.
 
-    # Assert — what SHOULD happen (this fails now)
-    assert result == expected_value
-```
+## Command recipes
 
-Run it to confirm it fails:
-```bash
-pytest tests/test_module.py::test_issue_NNN -x -v
-# Should FAIL — that's the point
-```
-
-## Step 4: Root Cause Analysis
-
-**Goal:** Find the exact code that causes the bug.
-
-1. **Locate** the relevant code:
-   ```bash
-   # Search for the function/class involved
-   grep -rn "function_name" src/ --include="*.py"
-   ```
-
-2. **Trace** the execution path from entry point to failure
-
-3. **Identify** the root cause:
-   - Logic error (wrong condition, off-by-one, missing case)
-   - Data error (unexpected input, type mismatch, null handling)
-   - Concurrency (race condition, missing lock)
-   - Configuration (wrong default, missing env var)
-   - Integration (API contract changed, dependency updated)
-
-4. **Assess impact:** What else uses this code? Could the fix break other things?
-
-**Comment on ticket:**
-```bash
-gh issue comment <NUMBER> --body "$(cat <<'EOF'
-🔍 **Root Cause**
-
-**Location:** `src/module.py:42`
-**Cause:** [description of what's wrong]
-**Impact:** [what else is affected]
-**Fix approach:** [brief plan]
-EOF
-)"
-```
-
-## Step 5: Implement the Fix
-
-**Goal:** Minimal, focused fix. Don't refactor, don't clean up neighbors.
-
-1. Fix the root cause — only the root cause
-2. Verify syntax: `python -m py_compile file.py` (or equivalent)
-3. Don't change unrelated code
-
-## Step 6: Verify
-
-**Goal:** The failing test now passes. Nothing else broke.
-
-```bash
-# 1. The regression test passes
-pytest tests/test_module.py::test_issue_NNN -x -v
-
-# 2. Full test suite still passes
-pytest tests/ -x -q
-
-# 3. Lint/type check
-ruff check . && mypy src/  # or your project's equivalent
-```
-
-If anything fails, fix it before proceeding.
-
-## Step 7: Document on Ticket
-
-**Goal:** Complete audit trail — what was wrong, what was fixed, proof it works.
-
-```bash
-gh issue comment <NUMBER> --body "$(cat <<'EOF'
-✅ **Fixed**
-
-**Root Cause:** [one sentence]
-**Fix:** [what changed, which files]
-**Regression Test:** `tests/test_module.py::test_issue_NNN`
-**PR:** #XX
-
-All tests passing.
-EOF
-)"
-```
-
-Commit and create PR:
-```bash
-git add -A
-git commit -m "Fix: [description] (#NNN)"
-git push -u origin HEAD
-gh pr create --title "Fix: [description] (#NNN)" --body "Closes #NNN"
-```
+All the `gh issue comment` heredocs, reproduction patterns, test templates,
+and verification commands live in
+[references/commands.md](references/commands.md). Load that file when you
+need the exact template text.
 
 ## Anti-Patterns
 
 - Don't fix without reproducing first
-- Don't skip the failing test — no test = no proof
-- Don't refactor while fixing — separate concerns
-- Don't close the ticket without documenting the fix
-- Don't fix multiple bugs in one PR
+- Don't skip the failing test — no test = no proof of fix
+- Don't refactor while fixing — separate concerns into separate PRs
+- Don't close the ticket without documenting what was wrong and what changed
+- Don't fix multiple unrelated bugs in one PR

@@ -9,209 +9,84 @@ metadata:
 
 ## Feature Implementation: Plan → Test → Build → Verify → Ship
 
-Core philosophy: **understand the plan, write tests first, implement to pass them, verify everything, ship clean.**
+**Core philosophy:** understand the plan, write tests first, implement to pass
+them, verify everything, ship clean.
 
-## Workflow
+## The eight steps
 
 ```
-Step 1: Load the Plan
-         ↓
-Step 2: Write Test Cases
-         ↓
-Step 3: Implement
-         ↓
-Step 4: Manual Verification
-         ↓
-Step 5: Write Automated Tests
-         ↓
-Step 6: Run Full Test Suite
-         ↓
-Step 7: Commit & PR
-         ↓
-Step 8: Document on Ticket
+1. Load the plan
+2. Write test cases
+3. Implement
+4. Manual verification
+5. Write automated tests
+6. Run full test suite
+7. Commit & PR
+8. Document on ticket
 ```
 
-## Step 1: Load the Plan
+### 1. Load the plan
 
-**Goal:** Understand exactly what to build before writing code.
+`gh issue view <N>`. Identify acceptance criteria (definition of done),
+interface contract (input/output types if defined), dependencies, and what's
+explicitly in and out of scope. If anything is unclear, ask the tech-lead via
+taskbox *before* writing code. Post a `🔧 **Started**` comment so the team
+knows work is in progress.
 
-```bash
-# Read the task/story issue
-gh issue view <NUMBER>
-```
+### 2. Write test cases (TDD red phase)
 
-Identify:
-- **Acceptance criteria** — the definition of done
-- **Interface contract** — input/output types if defined
-- **Dependencies** — what must exist before this works
-- **Scope** — what's explicitly IN and OUT
+Define "done" as executable tests before implementing. For each acceptance
+criterion, write a test. Cover happy path, error cases, edge cases. Run them
+and confirm they fail — that's the red phase.
 
-If anything is unclear, ask via taskbox before starting:
-```bash
-python3 octobots/skills/taskbox/scripts/relay.py send \
-  --from $OCTOBOTS_ID --to tech-lead "Question about #NNN: [specific question]"
-```
+### 3. Implement
 
-**Comment on ticket:**
-```bash
-gh issue comment <NUMBER> --body "🔧 **Started**: [brief approach description]"
-```
+Write the minimum code to pass the tests. Rules:
 
-## Step 2: Write Test Cases
+- **Follow existing patterns** — read similar features in the codebase first
+- **One change at a time** — verify syntax after each file edit
+- **Match the interface contract exactly** if the task defines one
+- **No scope creep** — don't add features beyond the acceptance criteria
+- **Don't refactor neighbors** — a feature task is not a cleanup task
+- **Don't optimize prematurely** — make it work before making it fast
 
-**Goal:** Define "done" as executable tests BEFORE implementing.
+### 4. Manual verification
 
-For each acceptance criterion, write a test:
+Sanity check before running automated tests. API → `curl` the endpoint. UI →
+browser snapshot + interaction. Backend logic → one-liner that calls the
+function. Catches the obvious breaks before test run.
 
-```python
-class TestFeatureName:
-    def test_happy_path(self):
-        """AC-1: User can [do the thing]."""
-        result = feature(valid_input)
-        assert result.status == "success"
+### 5. Write automated tests
 
-    def test_error_case(self):
-        """AC-2: Invalid input returns clear error."""
-        with pytest.raises(ValidationError):
-            feature(invalid_input)
+Extend the test cases from step 2 with integration and E2E tests if the
+feature touches external systems (DB, APIs) or has a UI component.
 
-    def test_edge_case(self):
-        """AC-3: Empty input handled gracefully."""
-        result = feature(empty_input)
-        assert result.items == []
-```
+### 6. Run full test suite
 
-Run to confirm they fail (TDD red phase):
-```bash
-pytest tests/test_feature.py -x -v
-# Should FAIL — implementation doesn't exist yet
-```
+All tests, lint, type check, and `git diff --stat` to confirm the scope of
+changes matches expectations. Don't ship if anything fails — fix it first.
 
-## Step 3: Implement
+### 7. Commit & PR
 
-**Goal:** Write the minimum code to pass the tests.
+Feature branch, focused commit, `gh pr create` with proper title and body.
+The `task-completion` skill has the full protocol.
 
-1. **Follow existing patterns** — read similar features in the codebase first
-2. **One change at a time** — verify syntax after each file edit
-3. **Interface contract first** — if the task defines input/output types, match them exactly
+### 8. Document on ticket
 
-```bash
-# Verify syntax after each edit
-python -m py_compile src/module.py  # Python
-npx tsc --noEmit                     # TypeScript
-```
+`✅ **Done**` comment with summary, test counts, PR number, and key
+architectural decisions. Notify PM via taskbox that the PR is ready for
+review.
 
-Don't:
-- Add features beyond the acceptance criteria
-- Refactor neighboring code
-- Add error handling for impossible scenarios
-- Optimize before it works
+## Command recipes
 
-## Step 4: Manual Verification
-
-**Goal:** Sanity check before automated tests.
-
-### For API features
-```bash
-curl -s http://localhost:PORT/api/endpoint | jq .
-```
-
-### For UI features
-```
-browser_navigate → browser_snapshot → interact → verify visually
-```
-
-### For backend logic
-```python
-python -c "from module import feature; print(feature(test_input))"
-```
-
-## Step 5: Write Automated Tests
-
-**Goal:** Extend the test cases from Step 2 with integration and E2E tests if needed.
-
-- **Unit tests** — already written in Step 2
-- **Integration tests** — if the feature touches external systems (DB, APIs)
-- **E2E tests** — if there's a UI component (use Playwright)
-
-```python
-# Integration test
-def test_feature_persists_to_db(db_session):
-    result = feature(valid_input)
-    saved = db_session.query(Model).get(result.id)
-    assert saved is not None
-    assert saved.name == valid_input.name
-```
-
-## Step 6: Run Full Test Suite
-
-**Goal:** Nothing broke.
-
-```bash
-# All tests
-pytest tests/ -x -q
-
-# Lint
-ruff check .  # or eslint
-
-# Type check
-mypy src/     # or tsc --noEmit
-
-# Check scope of changes
-git --no-pager diff --stat
-```
-
-If anything fails, fix it. Don't ship broken code.
-
-## Step 7: Commit & PR
-
-```bash
-git add src/ tests/
-git commit -m "feat: [description] (#NNN)"
-git push -u origin HEAD
-gh pr create --title "feat: [description] (#NNN)" \
-  --body "$(cat <<'EOF'
-## Summary
-- [what was built]
-- [key decisions made]
-
-## Test Plan
-- [x] Unit tests: N tests
-- [x] Integration tests: N tests
-- [ ] E2E tests: if applicable
-
-Closes #NNN
-EOF
-)"
-```
-
-## Step 8: Document on Ticket
-
-```bash
-gh issue comment <NUMBER> --body "$(cat <<'EOF'
-✅ **Done**
-
-**Implemented:** [summary]
-**Tests:** N unit + N integration
-**PR:** #XX
-**Key decisions:** [any architectural choices]
-
-All tests passing. Ready for review.
-EOF
-)"
-```
-
-Notify PM:
-```bash
-python3 octobots/skills/taskbox/scripts/relay.py send \
-  --from $OCTOBOTS_ID --to project-manager \
-  "TASK (#NNN) complete. PR #XX ready for review. [one-line summary]"
-```
+All the test templates, verification commands, PR body heredocs, and taskbox
+notifications live in [references/commands.md](references/commands.md). Load
+that file when you need exact command syntax.
 
 ## Anti-Patterns
 
 - Don't implement without understanding the acceptance criteria
-- Don't skip tests — they're proof of correctness
+- Don't skip tests — they're proof of correctness, not overhead
 - Don't expand scope beyond what the task defines
 - Don't commit without running the full test suite
-- Don't forget to document on the ticket
+- Don't forget to document on the ticket — the audit trail matters

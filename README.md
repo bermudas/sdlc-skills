@@ -74,6 +74,69 @@ Every skill under `skills/<name>/` follows the
 directly at `skills/<name>/` without going through the Claude plugin layer
 or this installer.
 
+## Using outside the Octobots supervisor
+
+These agents and skills install cleanly into stock Claude Code (or Cursor /
+Windsurf / Copilot) and are useful on their own — a BA can draft stories, a
+tech-lead can review a PR, `plan-feature` and `bugfix-workflow` run
+end-to-end with just `git` and `gh`. But several pieces assume the
+[Octobots supervisor framework](https://github.com/arozumenko/octobots) is
+running underneath them, and those assumptions will be visible if you use
+the agents standalone. Read this before you install.
+
+### Frontmatter extensions the supervisor owns
+
+| Key | Owned by | Stock-Claude behavior |
+|---|---|---|
+| `workspace: clone` | supervisor | Ignored. In Octobots, the supervisor launches `python-dev` and `js-dev` in their own git clones so branches don't collide; without it, all devs share your working tree and will step on each other. |
+| `skills: [taskbox, memory, ...]` | partly supervisor | `taskbox` and `memory` are bundled *inside* the supervisor, not published here — they're no-ops on stock Claude Code, and any instruction that says "check your inbox" or "snapshot memory" will silently do nothing. |
+
+### `@import` paths that require a seeded project
+
+Several agents import runtime state via Claude Code's `@`-import syntax:
+
+```markdown
+@.octobots/memory/<role>/snapshot.md
+```
+
+These files are written by the supervisor's `memory` skill at launch. On
+stock Claude Code, the import resolves to a missing file and the agent
+starts without its persistent memory. That's survivable — the agent still
+works — but any phrase like "read your snapshot before acting" is a
+no-op until you either (a) run the Octobots supervisor, or (b) create the
+file yourself.
+
+### Shell commands that assume the supervisor is present
+
+Agent bodies contain commands like:
+
+```bash
+python octobots/skills/taskbox/scripts/relay.py send --from scout --to pm "…"
+```
+
+These are **hard-coded references to the supervisor's taskbox**. On stock
+Claude Code they'll fail with "No such file or directory." Treat those
+lines as prompts for the agent to *describe* the handoff verbally instead
+— the intent (who hands work to whom, in what order) is still
+communicated, even if the literal command doesn't run.
+
+### What works unchanged on stock Claude Code
+
+- `ba`, `tech-lead`, `project-manager`, `qa-engineer`, `scout`,
+  `personal-assistant` — all run fine as subagents. They just won't send
+  taskbox messages.
+- Every skill under `skills/` — `plan-feature`, `bugfix-workflow`,
+  `implement-feature`, `task-completion`, `code-review`, `tdd`,
+  `git-workflow`, `playwright-testing`, `browser-verify`,
+  `issue-tracking`, `goal-verifier`, `context-gatherer`, `deep-research`,
+  `obsidian-vault`, `msgraph`. None of them depend on the supervisor.
+- Developer agents work on your single working tree instead of a
+  supervisor-managed clone; coordinate merges manually.
+
+If you want the full orchestrated experience (multi-agent taskbox, per-dev
+clones, supervisor TUI, persistent memory snapshots), install the
+Octobots supervisor alongside these agents.
+
 ## Repository layout
 
 ```
@@ -120,7 +183,7 @@ sdlc-skills/
 | `personal-assistant` | Conversational assistant: vault, email, calendar, daily brief |
 | `scout` | Maps unfamiliar codebases — explores, documents patterns, flags risks |
 
-### Workflow skills — SDLC-coupled (4)
+### Workflow skills — SDLC-coupled (5)
 
 | Skill | What it does |
 |---|---|
@@ -128,6 +191,7 @@ sdlc-skills/
 | `plan-feature` | Feature planning workflow used by BA / Tech Lead |
 | `implement-feature` | Feature implementation workflow used by devs |
 | `project-seeder` | Scout's project onboarding / configuration flow |
+| `task-completion` | Five-step task completion protocol: verify → commit → PR → comment → notify |
 
 ### Generic dev skills (12)
 

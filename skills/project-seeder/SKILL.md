@@ -20,16 +20,38 @@ project-root/
 ├── AGENTS.md                     ← Full team reference: stack, commands, conventions
 └── .octobots/
     ├── profile.md                ← Quick-reference project card
+    ├── team-comms.md             ← Who's on the team and how to route work (Step 6.5)
     ├── architecture.md           ← System design map (if complex enough)
     ├── conventions.md            ← Detected coding standards
-    └── testing.md                ← Test infrastructure details
+    ├── testing.md                ← Test infrastructure details
+    ├── roles-manifest.yaml       ← Input for spawn readiness check (Step 7b)
+    └── memory/<role-id>.md       ← Per-role project briefings (Step 7c)
 ```
 
 Not every project needs all files. Skip what's not relevant.
 
+## References
+
+The step-by-step templates and detailed procedures live alongside this SKILL.md:
+
+- **[references/templates.md](references/templates.md)** — full templates for
+  every generated file (CLAUDE.md / AGENTS.md / profile / conventions /
+  testing / architecture / roles-manifest.yaml / role-memory seeding)
+- **[references/team-comms-templates.md](references/team-comms-templates.md)**
+  — `.octobots/team-comms.md` templates by host (taskbox, Claude, Copilot,
+  Cursor, Windsurf)
+- **[references/team-comms-workflow.md](references/team-comms-workflow.md)**
+  — full Step 6.5 detection and generation procedure (6.5a–6.5g)
+- **[references/role-customization.md](references/role-customization.md)** —
+  Step 7 persona repurposing procedure (7a–7c)
+
+---
+
 ## Step 1: Generate CLAUDE.md
 
-This is the most immediately impactful file. Claude Code loads it automatically at the start of every session, so every agent has project context without doing anything. **Keep it under 80 lines.**
+The most immediately impactful file. Claude Code loads it automatically at
+the start of every session, so every agent has project context without
+doing anything. **Keep it under 80 lines.**
 
 **Check first — it may already exist:**
 
@@ -37,36 +59,32 @@ This is the most immediately impactful file. Claude Code loads it automatically 
 cat CLAUDE.md 2>/dev/null && echo "EXISTS" || echo "NOT FOUND"
 ```
 
-- **If it doesn't exist:** create it fresh from the template in `references/templates.md`
-- **If it exists:** treat it as the engineer's carefully crafted document. Read the whole thing before touching anything. Make only surgical additions for genuinely missing facts (e.g. a command you verified that isn't listed). Fix only clear errors (e.g. a command that doesn't exist in the project). Do not restructure, reword, or "improve" prose — the wording is intentional. When in doubt, leave it alone and ask the engineer directly in the terminal.
+- **If it doesn't exist:** create it fresh from the template in
+  `references/templates.md`
+- **If it exists:** treat it as the engineer's carefully crafted document.
+  Read the whole thing before touching anything. Make only surgical
+  additions for genuinely missing facts (e.g. a command you verified that
+  isn't listed). Fix only clear errors. Do not restructure, reword, or
+  "improve" prose — the wording is intentional. When in doubt, leave it
+  alone and ask the engineer directly.
 
-**What belongs here:**
-- One-paragraph project overview
-- The 3-5 most important commands (install, dev, test)
-- Critical conventions an agent must follow to not break things
-- Key paths (entry points, test dirs, config files)
-- A pointer to `AGENTS.md` for full detail
+**What belongs here:** one-paragraph project overview, 3-5 most important
+commands (install, dev, test), critical conventions, key paths (entry
+points, test dirs, config files), a pointer to `AGENTS.md` for full detail.
 
-**What does NOT belong here:**
-- Exhaustive command lists (that's AGENTS.md)
-- Full architecture diagrams (`.octobots/architecture.md`)
-- Long convention catalogues (`.octobots/conventions.md`)
-
-Use the `CLAUDE.md` template in `references/templates.md` as a reference for structure.
+**What does NOT belong here:** exhaustive command lists (that's AGENTS.md),
+full architecture diagrams (`.octobots/architecture.md`), long convention
+catalogues (`.octobots/conventions.md`).
 
 ## Step 2: Generate AGENTS.md
 
-The full team reference. Every role reads it on-demand. Use the template in `references/templates.md` and fill it with actual findings.
+The full team reference. Every role reads it on-demand. Use the template
+in `references/templates.md` and fill it with actual findings.
 
-**Key sections:**
-- Project overview (1 paragraph)
-- Tech stack (languages, frameworks, databases, infra)
-- Repository structure (directory tree with annotations)
-- Build & run commands (install, dev, test, lint, deploy)
-- Coding conventions (detected from codebase)
-- Testing (framework, commands, patterns)
-- CI/CD (what runs, where, how)
-- Environment (required vars, .env setup)
+**Key sections:** project overview (1 paragraph), tech stack, repository
+structure (directory tree with annotations), build & run commands
+(install, dev, test, lint, deploy), coding conventions (detected from
+codebase), testing (framework, commands, patterns), CI/CD, environment.
 
 **Rules:**
 - Only document what you've verified. Don't guess build commands.
@@ -76,74 +94,48 @@ The full team reference. Every role reads it on-demand. Use the template in `ref
 
 ## Step 3: Generate .octobots/profile.md
 
-Quick-reference card with YAML frontmatter:
-
-```yaml
----
-project: repo-name
-team: team-name (ask if unknown)
-issue-tracker: URL (detect from .git/config, README, or ask)
-default-branch: main/master/develop (detect from git)
-languages: [python, typescript]
----
-```
+Quick-reference card with YAML frontmatter (project, team, issue-tracker,
+default-branch, languages). See `references/templates.md`.
 
 ## Step 4: Generate .octobots/conventions.md (if patterns detected)
 
-Only create if you found clear patterns. Document what IS, not what should be.
-
-Structure:
-- Naming conventions (files, variables, classes)
-- Import ordering
-- Error handling patterns
-- Code organization (layers, modules)
-- Comment/documentation style
+Only create if you found clear patterns. Document what IS, not what should
+be. Cover naming, import ordering, error handling, code organization,
+comment/doc style.
 
 ## Step 5: Generate .octobots/architecture.md (if complex)
 
-Only for multi-service or non-trivial architectures:
-- Service/component map
-- Data flow between components
-- API boundaries
-- Database schema overview
-- Infrastructure diagram (text-based)
+Only for multi-service or non-trivial architectures: service/component map,
+data flow, API boundaries, database schema overview, infrastructure diagram
+(text-based).
 
 ## Step 6: Generate .octobots/testing.md (if test infra exists)
 
-QA engineer reads this. Include:
-- Test framework and config
-- How to run tests (exact commands)
-- Fixture/setup patterns
-- Test data strategy
-- CI test pipeline
-- Coverage tools
-- Known flaky areas
+QA engineer reads this. Include test framework and config, how to run
+tests (exact commands), fixture/setup patterns, test data strategy, CI
+test pipeline, coverage tools, known flaky areas.
+
+## Step 6.5: Generate `.octobots/team-comms.md`
+
+Every project — taskbox *or* host-native — gets a scout-generated
+`.octobots/team-comms.md` that names the transport, the installed
+personas, and the exact invocation syntax.
+
+Full procedure — host detection, persona enumeration, template selection,
+taskbox-skill injection, Copilot capability declaration, idempotence
+rules — lives in **[references/team-comms-workflow.md](references/team-comms-workflow.md)**.
+Templates live in **[references/team-comms-templates.md](references/team-comms-templates.md)**.
 
 ## Step 7: Role Customization (if roles need repurposing)
 
-Triggered when the project's detected stack doesn't match the default role set — e.g., a game engine project, a Rust CLI, a data science project. Skip this step only if all default roles fit the project as-is.
+Only runs when the detected stack doesn't match the default role set (e.g.
+game engines, Rust CLIs, data science). Skip entirely if defaults fit.
 
-### Step 7a: Rewrite SOUL.md and AGENT.md for repurposed roles
+Full procedure — SOUL.md/AGENT.md rewrites, `roles-manifest.yaml`
+generation, role memory seeding — lives in
+**[references/role-customization.md](references/role-customization.md)**.
 
-For each role being repurposed:
-- Read the existing `SOUL.md` fully. Update the persona name, personality framing, and domain expertise sections. Leave voice, values, and working style intact — those are reusable across domains.
-- Read the existing `AGENT.md` fully. Update the YAML frontmatter `name` and `description` fields, the identity paragraph, and the mission statement. Leave session lifecycle, taskbox commands, and communication conventions intact — those are structural scaffolding.
-
-Surgical rule: if a section is about *how to operate* (taskbox, inbox, restart protocol), leave it. If it's about *who you are and what you know*, update it.
-
-### Step 7b: Generate `.octobots/roles-manifest.yaml`
-
-Use the template in `references/templates.md`. Fill in all roles — customized and unchanged. Set `customized: true` and add `repurposed_for` for any repurposed roles.
-
-This file is the input for `octobots/scripts/check-spawn-ready.py`. Generate it before running any readiness checks.
-
-### Step 7c: Seed role memory files
-
-Files live at `.octobots/memory/<role-id>.md`. Use the memory seeding template from `references/templates.md`.
-
-Fill in "Project Knowledge" and "My Role Focus" for **every role** — not just customized ones. An unchanged role still needs to know the stack, key paths, and what its work looks like on this specific project.
-
-"My Role Focus" is written by scout, not filled from a template — it should reflect actual understanding of what this role does on this project.
+---
 
 ## Validation
 
@@ -175,7 +167,3 @@ Run the full readiness check:
 ```bash
 python3 octobots/scripts/check-spawn-ready.py
 ```
-
-## Details
-
-See `references/templates.md` for full templates for each file.

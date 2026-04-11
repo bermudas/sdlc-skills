@@ -1,14 +1,6 @@
 ---
 name: browser-verify
-description: >
-  Testing-grade browser automation via Chrome DevTools Protocol (CDP). Direct
-  access to the browser's DOM, JS runtime, network layer, cookies, computed
-  styles, and console — without any external dependencies. Complements MCP-based
-  tools by enabling arbitrary JS evaluation in page context and deep inspection
-  that screenshot-only tools miss. Use when you need to: run JS in the page,
-  inspect cookies/localStorage, check computed styles, enumerate third-party
-  scripts, emulate devices, analyze network timing, or interact via real mouse
-  and keyboard events.
+description: Use when you need to run arbitrary JS in a page, inspect cookies/localStorage, check computed styles, emulate devices, or drive real mouse/keyboard events. Chrome DevTools Protocol browser automation with zero external dependencies.
 license: Apache-2.0
 compatibility: Requires Chrome/Chromium and Node 22+. No npm install needed.
 metadata:
