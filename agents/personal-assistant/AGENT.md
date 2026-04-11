@@ -52,7 +52,7 @@ say "I would do X if I could" — just do X.
 | Send a file/image/PDF/audio/voice | under taskbox: `notify(message="caption", file="/abs/path")`; under host-native subagents: attach/show through your reply surface |
 | Read/write the user's second brain | `obsidian-vault` skill (`vault.py`) |
 | Email / calendar / Teams | `msgraph` skill |
-| Persist across sessions | `memory` skill (`memory.py log` / `write`) |
+| Persist across sessions | `memory` skill — append a line to today's daily log, or write a curated entry (read the skill's SKILL.md for the exact file layout) |
 | Schedule a future action (taskbox mode) | `python3 octobots/scripts/schedule-job.py create ...` |
 | Read files, search code, run commands | Read / Grep / Glob / Bash tools |
 | Look something up on the web | WebSearch / WebFetch / Tavily MCP |
@@ -147,13 +147,15 @@ so it's safe under either transport.
 
 Two stores:
 
-- **Daily log** — `memory.py log "text"` — append-only timestamped lines for
-  episodic recall (what you did, what the user said, transient context).
-  Cheap, use liberally.
-- **Curated** — `memory.py write <name> --type T --description D --content "..."`
-  — durable typed entries for facts, preferences, decisions. Types: `user`,
-  `feedback`, `project`, `reference`. Use sparingly — costs an index entry
-  in every snapshot.
+- **Daily log** — append a timestamped line to
+  `.octobots/memory/personal-assistant/daily/<today>.md` (`Edit` if the
+  file exists, `Write` if it doesn't). Episodic recall — what you did,
+  what the user said, transient context. Cheap, use liberally.
+- **Curated** — write a typed entry at
+  `.octobots/memory/personal-assistant/<slug>.md` with `name` /
+  `description` / `type` frontmatter, then update the one-line index in
+  `MEMORY.md`. Types: `user`, `feedback`, `project`, `reference`. Use
+  sparingly — costs an index slot in every snapshot.
 
 If unsure: `log` it. Promote later if it stays relevant. The supervisor
 regenerates `snapshot.md` at every session start, so today's notes are in
@@ -176,7 +178,7 @@ skill's `SKILL.md` for the full layout and CLI; the headlines:
   to move from inbox into its right home.
 
 The vault is for things the *user* might want to reread. Agent-internal
-state goes to `memory.py`, never to the vault.
+state goes to `.octobots/memory/personal-assistant/`, never to the vault.
 
 ## Background duty — third-party signals (email, Teams, Slack, etc.)
 
@@ -216,7 +218,7 @@ informs priority.
 | Notable | `vault.py file` into right folder, `vault.py person --touch` |
 | Open loop | `vault.py loop add "..."` + schedule reminder via `schedule-job.py` |
 | Digest item | Buffer until next digest |
-| Nothing actionable | `memory.py log "..."`, no further action |
+| Nothing actionable | append a line to today's daily log under `.octobots/memory/personal-assistant/daily/`, no further action |
 
 ## Digest generation
 
