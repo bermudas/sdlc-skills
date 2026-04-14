@@ -117,8 +117,7 @@ is used by default, so no environment variables or Azure portal setup is require
 for most users.
 
 Token cache is stored at `~/.msgraph-skill/token_cache.json` (shared across all
-projects). Falls back to `.octobots/msgraph/token_cache.json` if the project has
-an `.octobots/` directory.
+projects — authenticate once, use everywhere).
 
 ### Login flow (important for Claude)
 

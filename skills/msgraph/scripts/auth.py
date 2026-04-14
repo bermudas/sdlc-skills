@@ -33,7 +33,7 @@ import msal
 from azure.core.credentials import AccessToken, TokenCredential
 
 # ---------------------------------------------------------------------------
-# .env loading — check skill root, then cwd, then project root (.octobots/..)
+# .env loading — check skill root, then cwd
 # ---------------------------------------------------------------------------
 
 def _load_dotenv() -> None:
@@ -43,9 +43,6 @@ def _load_dotenv() -> None:
         Path(__file__).resolve().parent.parent / ".env",  # skill root
         Path.cwd() / ".env",                               # cwd
     ]
-    octobots_dir = Path.cwd() / ".octobots"
-    if octobots_dir.is_dir():
-        candidates.append(octobots_dir.parent / ".env")    # project root
     seen: set[str] = set()
     for env_path in candidates:
         if not env_path.is_file():
@@ -87,24 +84,12 @@ SCOPES = [
 
 
 def _get_cache_path() -> Path:
-    """Return the token cache file path.
+    """Return ``~/.msgraph-skill/token_cache.json``.
 
-    Resolution order:
-      1. Home-dir fallback ``~/.msgraph-skill/token_cache.json`` — if the file
-         already exists there, always use it so that a single credential is
-         shared across projects.
-      2. Project-local ``.octobots/msgraph/token_cache.json`` — used when
-         ``.octobots/`` exists and no home-dir cache is present yet.
-      3. Home-dir path as default for fresh installs.
+    A single token cache is shared across all projects so the user only
+    needs to authenticate once.
     """
-    home_cache = Path.home() / ".msgraph-skill" / "token_cache.json"
-    if home_cache.is_file():
-        return home_cache
-    project_local = Path.cwd() / ".octobots" / "msgraph" / "token_cache.json"
-    octobots_dir = Path.cwd() / ".octobots"
-    if octobots_dir.exists():
-        return project_local
-    return home_cache
+    return Path.home() / ".msgraph-skill" / "token_cache.json"
 
 
 class _MSALCredential(TokenCredential):
