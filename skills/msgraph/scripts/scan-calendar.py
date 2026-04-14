@@ -13,113 +13,105 @@ Usage:
 
 from __future__ import annotations
 
-import asyncio
+import json
 import sys
 import urllib.parse
+import urllib.request
+import urllib.error
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
 
 from _common import build_arg_parser, compute_since_dt, append_results, maybe_relay, build_output_item
-from auth import get_client
+from auth import _build_credential, SCOPES
 
 _GRAPH_BASE = "https://graph.microsoft.com/v1.0"
 
 
-async def _fetch_calendar_events(start_dt: datetime, end_dt: datetime) -> list[dict]:
-    client = get_client()
+def _get(url: str, credential) -> dict:
+    token = credential.get_token(*SCOPES)
+    req = urllib.request.Request(
+        url,
+        headers={
+            "Authorization": f"Bearer {token.token}",
+            "Accept": "application/json",
+        },
+        method="GET",
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            return json.loads(resp.read().decode("utf-8"))
+    except urllib.error.HTTPError as exc:
+        body = exc.read().decode("utf-8", errors="replace")
+        raise SystemExit(f"Graph API error {exc.code}: {body}") from None
+
+
+def _ensure_utc(dt_str: str | None) -> str | None:
+    if not dt_str:
+        return dt_str
+    if dt_str.endswith("Z") or "+" in dt_str[10:] or (dt_str.count("-") > 2):
+        return dt_str
+    return dt_str + "Z"
+
+
+def _fetch_calendar_events(start_dt: datetime, end_dt: datetime) -> list[dict]:
+    credential = _build_credential()
 
     start_str = start_dt.strftime("%Y-%m-%dT%H:%M:%SZ")
     end_str = end_dt.strftime("%Y-%m-%dT%H:%M:%SZ")
 
-    # Use calendarView for a proper time-range query.
-    # Note: calendarView does NOT support $orderby — results are always ordered
-    # by start/dateTime and attempting to set $orderby causes a 400 error.
     url = _GRAPH_BASE + "/me/calendarView?" + urllib.parse.urlencode({
         "startDateTime": start_str,
         "endDateTime": end_str,
         "$select": "id,subject,start,end,organizer,attendees,location,bodyPreview,isAllDay,isCancelled",
         "$top": "100",
     })
-    result = await client.me.calendar_view.with_url(url).get()
 
     items: list[dict] = []
-    while result:
-        for event in result.value or []:
+    data = _get(url, credential)
+    while True:
+        for event in data.get("value", []):
             organizer = None
-            if event.organizer and event.organizer.email_address:
-                organizer = {
-                    "name": event.organizer.email_address.name,
-                    "address": event.organizer.email_address.address,
-                }
+            org_email = (event.get("organizer") or {}).get("emailAddress")
+            if org_email:
+                organizer = {"name": org_email.get("name"), "address": org_email.get("address")}
 
             attendees = []
-            if event.attendees:
-                for att in event.attendees:
-                    if att.email_address:
-                        attendees.append(
-                            {
-                                "name": att.email_address.name,
-                                "address": att.email_address.address,
-                                "status": (
-                                    str(att.status.response)
-                                    if att.status and att.status.response
-                                    else None
-                                ),
-                            }
-                        )
+            for att in event.get("attendees") or []:
+                ea = att.get("emailAddress")
+                if ea:
+                    status = (att.get("status") or {}).get("response")
+                    attendees.append({"name": ea.get("name"), "address": ea.get("address"), "status": status})
 
-            # event.start.date_time is in UTC when calendarView is queried
-            # with UTC-expressed startDateTime/endDateTime (as we always do).
-            # Append an explicit 'Z' suffix if the string has no timezone marker,
-            # so that the ts field is unambiguous ISO-8601 UTC.
-            def _ensure_utc(dt_str: str | None) -> str | None:
-                if not dt_str:
-                    return dt_str
-                # Already has a timezone marker (Z or ±HH:MM offset)
-                if dt_str.endswith("Z") or "+" in dt_str[10:] or (dt_str.count("-") > 2):
-                    return dt_str
-                return dt_str + "Z"
-
-            raw_start = _ensure_utc(event.start.date_time if event.start else None)
+            raw_start = _ensure_utc((event.get("start") or {}).get("dateTime"))
             ts = raw_start or start_str
-            raw_end = _ensure_utc(event.end.date_time if event.end else None)
+            raw_end = _ensure_utc((event.get("end") or {}).get("dateTime"))
 
-            subject = event.subject or "(no title)"
+            subject = event.get("subject") or "(no title)"
             organizer_label = organizer["address"] if organizer else "unknown organizer"
             summary = f"{subject} — organized by {organizer_label}"
 
             detail = {
-                "id": event.id,
-                "subject": event.subject,
+                "id": event.get("id"),
+                "subject": event.get("subject"),
                 "start": ts,
                 "end": raw_end,
-                "isAllDay": event.is_all_day,
-                "isCancelled": event.is_cancelled,
+                "isAllDay": event.get("isAllDay"),
+                "isCancelled": event.get("isCancelled"),
                 "organizer": organizer,
                 "attendees": attendees,
-                "location": (
-                    event.location.display_name
-                    if event.location
-                    else None
-                ),
-                "bodyPreview": event.body_preview,
+                "location": (event.get("location") or {}).get("displayName"),
+                "bodyPreview": event.get("bodyPreview"),
             }
             items.append(
-                build_output_item(
-                    source="calendar",
-                    ts=ts,
-                    summary=summary,
-                    detail=detail,
-                )
+                build_output_item(source="calendar", ts=ts, summary=summary, detail=detail)
             )
 
-        # Pagination: follow @odata.nextLink if present
-        next_link = getattr(result, "odata_next_link", None)
+        next_link = data.get("@odata.nextLink")
         if not next_link:
             break
-        result = await client.me.calendar_view.with_url(next_link).get()
+        data = _get(next_link, credential)
 
     return items
 
@@ -146,7 +138,7 @@ def main() -> None:
         start_dt = compute_since_dt(args.since)
         end_dt = now
 
-    items = asyncio.run(_fetch_calendar_events(start_dt, end_dt))
+    items = _fetch_calendar_events(start_dt, end_dt)
 
     if not items:
         sys.exit(0)

@@ -9,72 +9,77 @@ Usage:
 
 from __future__ import annotations
 
-import asyncio
+import json
 import sys
 import urllib.parse
-from datetime import datetime
+import urllib.request
+import urllib.error
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
 
 from _common import build_arg_parser, compute_since_dt, append_results, maybe_relay, build_output_item
-from auth import get_client
+from auth import _build_credential, SCOPES
 
-# Base URL for Graph v1.0
 _GRAPH_BASE = "https://graph.microsoft.com/v1.0"
 
 
-async def _fetch_emails(since_dt: datetime, sender: str | None) -> list[dict]:
-    client = get_client()
-    since_str = since_dt.strftime("%Y-%m-%dT%H:%M:%SZ")
+def _get(url: str, credential) -> dict:
+    token = credential.get_token(*SCOPES)
+    req = urllib.request.Request(
+        url,
+        headers={
+            "Authorization": f"Bearer {token.token}",
+            "Accept": "application/json",
+        },
+        method="GET",
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            return json.loads(resp.read().decode("utf-8"))
+    except urllib.error.HTTPError as exc:
+        body = exc.read().decode("utf-8", errors="replace")
+        raise SystemExit(f"Graph API error {exc.code}: {body}") from None
+
+
+def _fetch_emails(since_str: str, sender: str | None) -> list[dict]:
+    credential = _build_credential()
 
     filter_parts = [f"receivedDateTime ge {since_str}"]
     if sender:
-        # Escape single-quotes in the address (e.g. o'brien@example.com)
         escaped = sender.replace("'", "''")
         filter_parts.append(f"from/emailAddress/address eq '{escaped}'")
     filter_expr = " and ".join(filter_parts)
 
-    # Use with_url() to pass OData params — the request_configuration object
-    # pattern requires exact kiota-generated classes per endpoint, whereas
-    # with_url() works with any Graph URL and is version-agnostic.
     url = _GRAPH_BASE + "/me/messages?" + urllib.parse.urlencode({
         "$filter": filter_expr,
         "$select": "id,subject,from,receivedDateTime,isRead,bodyPreview,hasAttachments",
         "$orderby": "receivedDateTime desc",
         "$top": "100",
     })
-    result = await client.me.messages.with_url(url).get()
 
     items = []
-    while result:
-        for msg in result.value or []:
-            received_ts = (
-                msg.received_date_time.isoformat()
-                if msg.received_date_time
-                else since_str
-            )
+    data = _get(url, credential)
+    while True:
+        for msg in data.get("value", []):
+            received_ts = msg.get("receivedDateTime", since_str)
+            from_obj = msg.get("from", {}).get("emailAddress")
             from_addr = (
-                {
-                    "name": msg.from_.email_address.name,
-                    "address": msg.from_.email_address.address,
-                }
-                if msg.from_ and msg.from_.email_address
+                {"name": from_obj.get("name"), "address": from_obj.get("address")}
+                if from_obj
                 else None
             )
             detail = {
-                "id": msg.id,
-                "subject": msg.subject,
+                "id": msg.get("id"),
+                "subject": msg.get("subject"),
                 "from": from_addr,
                 "receivedDateTime": received_ts,
-                "isRead": msg.is_read,
-                "hasAttachments": msg.has_attachments,
-                "bodyPreview": msg.body_preview,
+                "isRead": msg.get("isRead"),
+                "hasAttachments": msg.get("hasAttachments"),
+                "bodyPreview": msg.get("bodyPreview"),
             }
-            sender_label = (
-                from_addr["address"] if from_addr else "unknown sender"
-            )
-            summary = f"{msg.subject or '(no subject)'} — from {sender_label}"
+            sender_label = from_addr["address"] if from_addr else "unknown sender"
+            summary = f"{msg.get('subject') or '(no subject)'} — from {sender_label}"
             items.append(
                 build_output_item(
                     source="email",
@@ -83,12 +88,10 @@ async def _fetch_emails(since_dt: datetime, sender: str | None) -> list[dict]:
                     detail=detail,
                 )
             )
-
-        # Pagination: follow @odata.nextLink if present
-        next_link = getattr(result, "odata_next_link", None)
+        next_link = data.get("@odata.nextLink")
         if not next_link:
             break
-        result = await client.me.messages.with_url(next_link).get()
+        data = _get(next_link, credential)
 
     return items
 
@@ -103,7 +106,8 @@ def main() -> None:
     args = parser.parse_args()
 
     since_dt = compute_since_dt(args.since)
-    items = asyncio.run(_fetch_emails(since_dt, args.sender))
+    since_str = since_dt.strftime("%Y-%m-%dT%H:%M:%SZ")
+    items = _fetch_emails(since_str, args.sender)
 
     if not items:
         sys.exit(0)

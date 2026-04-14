@@ -11,8 +11,8 @@ Usage from other scripts:
     client = get_client()          # v1.0 GraphServiceClient
     client = get_client(beta=True) # beta GraphServiceClient
 
-Environment variables:
-    MSGRAPH_CLIENT_ID  - Azure AD app client ID (required — no default)
+Environment variables (can also be set in .env at project root or skill root):
+    MSGRAPH_CLIENT_ID  - Azure AD app client ID (default: octobots public client)
     MSGRAPH_TENANT_ID  - Azure AD tenant ID (default: "common" for multi-tenant)
 """
 
@@ -28,9 +28,48 @@ from typing import Optional
 import msal
 from azure.core.credentials import AccessToken, TokenCredential
 
-# No hardcoded default — users must register their own Azure AD app.
-# See SKILL.md § "Azure AD App Registration" for instructions.
-DEFAULT_CLIENT_ID = ""
+# ---------------------------------------------------------------------------
+# .env loading — check skill root, then cwd, then project root (.octobots/..)
+# ---------------------------------------------------------------------------
+
+def _load_dotenv() -> None:
+    """Load .env files (skill root → cwd → project root) without overwriting
+    variables that are already set in the real environment."""
+    candidates = [
+        Path(__file__).resolve().parent.parent / ".env",  # skill root
+        Path.cwd() / ".env",                               # cwd
+    ]
+    octobots_dir = Path.cwd() / ".octobots"
+    if octobots_dir.is_dir():
+        candidates.append(octobots_dir.parent / ".env")    # project root
+    seen: set[str] = set()
+    for env_path in candidates:
+        if not env_path.is_file():
+            continue
+        resolved = env_path.resolve()
+        if resolved in seen:
+            continue
+        seen.add(resolved)
+        for line in env_path.read_text("utf-8").splitlines():
+            line = line.strip()
+            if not line or line.startswith("#"):
+                continue
+            if "=" not in line:
+                continue
+            key, _, value = line.partition("=")
+            key = key.strip()
+            value = value.strip().strip("\"'")
+            # Don't overwrite real env vars
+            if key not in os.environ:
+                os.environ[key] = value
+
+_load_dotenv()
+
+# ---------------------------------------------------------------------------
+# Defaults
+# ---------------------------------------------------------------------------
+
+DEFAULT_CLIENT_ID = "084a3e9f-a9f4-43f7-89f9-d229cf97853e"
 DEFAULT_TENANT_ID = "common"
 
 SCOPES = [
@@ -38,27 +77,30 @@ SCOPES = [
     "Calendars.Read",
     "Team.ReadBasic.All",
     "Channel.ReadBasic.All",
-    "ChannelMessage.Read.All",
     "Sites.Read.All",
     "Files.Read.All",
 ]
 
 
 def _get_cache_path() -> Path:
-    """Return the token cache file path, preferring project-local over home.
+    """Return the token cache file path.
 
-    Project-local path is used when the ``.octobots/`` runtime directory
-    already exists (created by ``init-project.sh`` or the first ``login`` run).
-    Falls back to ``~/.msgraph-skill/`` so the same credential can be reused
-    across multiple projects.
+    Resolution order:
+      1. Home-dir fallback ``~/.msgraph-skill/token_cache.json`` — if the file
+         already exists there, always use it so that a single credential is
+         shared across projects.
+      2. Project-local ``.octobots/msgraph/token_cache.json`` — used when
+         ``.octobots/`` exists and no home-dir cache is present yet.
+      3. Home-dir path as default for fresh installs.
     """
+    home_cache = Path.home() / ".msgraph-skill" / "token_cache.json"
+    if home_cache.is_file():
+        return home_cache
     project_local = Path.cwd() / ".octobots" / "msgraph" / "token_cache.json"
-    # Check the .octobots/ parent dir — not the deeper msgraph/ sub-dir —
-    # so the project-local path is stable from the very first run.
     octobots_dir = Path.cwd() / ".octobots"
-    if octobots_dir.exists() or not Path.home().exists():
+    if octobots_dir.exists():
         return project_local
-    return Path.home() / ".msgraph-skill" / "token_cache.json"
+    return home_cache
 
 
 class _MSALCredential(TokenCredential):
@@ -118,7 +160,21 @@ class _MSALCredential(TokenCredential):
         accounts = self._app.get_accounts()
         if not accounts:
             return None
+        # Try the exact requested scopes first.  If that fails (e.g. cached
+        # token was obtained with a different scope set), fall back to the
+        # scopes the refresh-token already covers — MSAL will use the RT to
+        # mint a new AT with whatever scopes are consented.
         result = self._app.acquire_token_silent(self._scopes, account=accounts[0])
+        if not result or "access_token" not in result:
+            result = self._app.acquire_token_silent_with_error(
+                self._scopes, account=accounts[0]
+            )
+        if not result or "access_token" not in result:
+            # Last resort: ask for just the scopes the RT already has by
+            # omitting force_refresh — let MSAL negotiate with the server.
+            result = self._app.acquire_token_silent(
+                self._scopes, account=accounts[0], force_refresh=True
+            )
         self._save_cache()
         return result
 
@@ -126,7 +182,7 @@ class _MSALCredential(TokenCredential):
     # TokenCredential protocol
     # ------------------------------------------------------------------
 
-    def get_token(self, *scopes: str, **kwargs) -> AccessToken:
+    def get_token(self, *_scopes: str, **_kwargs) -> AccessToken:
         result = self._acquire_silent()
         if not result or "access_token" not in result:
             raise RuntimeError(
@@ -145,8 +201,26 @@ class _MSALCredential(TokenCredential):
         flow = self._app.initiate_device_flow(scopes=self._scopes)
         if "user_code" not in flow:
             raise RuntimeError(f"Failed to initiate device flow: {flow}")
-        print(flow["message"])
+
+        url = flow.get("verification_uri", "https://microsoft.com/devicelogin")
+        code = flow["user_code"]
+        # Machine-readable lines for Claude to extract and show to the user
+        print(f"LOGIN_URL={url}")
+        print(f"LOGIN_CODE={code}")
         print()
+        # Human-readable instructions (also visible if run directly in terminal)
+        print("=" * 60)
+        print("  Microsoft Graph — Device Code Login")
+        print("=" * 60)
+        print()
+        print(f"  1. Open:  {url}")
+        print(f"  2. Enter: {code}")
+        print()
+        print("=" * 60)
+        print()
+        print("Waiting for you to complete sign-in in the browser …")
+        print()
+
         result = self._app.acquire_token_by_device_flow(flow)
         if "error" in result:
             raise RuntimeError(
@@ -225,11 +299,13 @@ def get_client(beta: bool = False):
 
 def _cmd_login() -> None:
     cred = _build_credential()
-    print("Starting device-code login …")
+    print(f"Client ID : {cred._app.client_id}")
+    print(f"Token cache: {cred._cache_path}")
+    print()
     result = cred.login()
     account = result.get("id_token_claims", {}).get("preferred_username", "unknown")
     print(f"Logged in as: {account}")
-    print(f"Token cache: {cred._cache_path}")
+    print(f"Token cache : {cred._cache_path}")
 
 
 def _cmd_status() -> None:

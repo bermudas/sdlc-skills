@@ -20,14 +20,34 @@ Windsurf, and GitHub Copilot. One repo contains:
 
 ### 1. Claude Code plugin marketplace (preferred inside Claude Code)
 
-```
+```bash
+# Add the marketplace source (once)
 /plugin marketplace add arozumenko/sdlc-skills
+
+# Install everything
 /plugin install sdlc-skills@sdlc-skills
+
+# — or install individual agents —
+/plugin install sdlc-skills@ba
+/plugin install sdlc-skills@tech-lead
+/plugin install sdlc-skills@project-manager
+/plugin install sdlc-skills@python-dev
+/plugin install sdlc-skills@js-dev
+/plugin install sdlc-skills@qa-engineer
+/plugin install sdlc-skills@scout
+/plugin install sdlc-skills@personal-assistant
+
+# — or install individual skills —
+/plugin install sdlc-skills@code-review
+/plugin install sdlc-skills@bugfix-workflow
+/plugin install sdlc-skills@tdd
+/plugin install sdlc-skills@msgraph
+# ... etc — see full list below
 ```
 
-Claude Code walks the plugin root, picks up everything under `agents/`,
-`skills/`, `commands/`, and `mcp/`, and wires it all up automatically. One
-command, whole toolkit.
+Each agent and skill is published as its own plugin entry, so you can
+pick exactly what you need. The `sdlc-skills` entry installs the full
+toolkit in one shot.
 
 ### 2. Direct install via npx (works for any IDE)
 

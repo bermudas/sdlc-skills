@@ -150,6 +150,9 @@ def _normalise_endpoint(endpoint: str) -> str:
 # Graph API call (with automatic pagination)
 # ---------------------------------------------------------------------------
 
+_MAX_PAGES = 10  # safety cap to avoid runaway pagination
+
+
 def _execute_query(
     endpoint: str,
     query_params: dict[str, Any],
@@ -157,8 +160,10 @@ def _execute_query(
 ) -> Any:
     """Execute a GET request against the Graph API and return the parsed response.
 
-    If the response contains @odata.nextLink, all pages are fetched and the
-    'value' arrays are merged into a single response object.
+    If the caller did NOT set ``$top`` and the response contains
+    ``@odata.nextLink``, additional pages are fetched (up to _MAX_PAGES) and
+    merged.  When ``$top`` is present the first page is returned as-is —
+    Graph already honours the limit server-side.
 
     The token is acquired fresh on every HTTP request via MSAL silent-acquire,
     so long paginated result sets get a refreshed token automatically.
@@ -173,6 +178,9 @@ def _execute_query(
 
     # Strip a leading "GET " prefix that sample YAML files may include
     endpoint = _normalise_endpoint(endpoint)
+
+    # Detect whether the caller explicitly capped results
+    has_top = "$top" in query_params
 
     url = base_url + endpoint
     if query_params:
@@ -208,17 +216,24 @@ def _execute_query(
 
     first = _get(url)
 
-    # Follow pagination if the response has a 'value' list
-    if "value" in first and isinstance(first["value"], list):
+    # Follow pagination only when the caller did not set $top (which already
+    # limits server-side) and cap at _MAX_PAGES to avoid runaway fetches.
+    if (
+        not has_top
+        and "value" in first
+        and isinstance(first["value"], list)
+    ):
         all_values = list(first["value"])
         next_link = first.get("@odata.nextLink")
-        while next_link:
+        pages = 1
+        while next_link and pages < _MAX_PAGES:
             page = _get(next_link)
             all_values.extend(page.get("value", []))
             next_link = page.get("@odata.nextLink")
+            pages += 1
         first["value"] = all_values
-        first.pop("@odata.nextLink", None)
 
+    first.pop("@odata.nextLink", None)
     return first
 
 

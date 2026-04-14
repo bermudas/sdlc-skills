@@ -16,107 +16,108 @@ scanned via ``/sites/{siteId}/drive/root/delta`` to find recently modified items
 
 from __future__ import annotations
 
-import asyncio
+import json
 import sys
 import urllib.parse
+import urllib.request
+import urllib.error
 from datetime import datetime, timezone
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
 
 from _common import build_arg_parser, compute_since_dt, append_results, maybe_relay, build_output_item
-from auth import get_client
+from auth import _build_credential, SCOPES
 
 _GRAPH_BASE = "https://graph.microsoft.com/v1.0"
 
 
-def _item_to_record(drive_item, since_dt: datetime) -> dict | None:
-    """Convert a DriveItem to an output record, or None if it should be skipped."""
-    if not drive_item.last_modified_date_time:
+def _get(url: str, credential) -> dict:
+    token = credential.get_token(*SCOPES)
+    req = urllib.request.Request(
+        url,
+        headers={
+            "Authorization": f"Bearer {token.token}",
+            "Accept": "application/json",
+        },
+        method="GET",
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            return json.loads(resp.read().decode("utf-8"))
+    except urllib.error.HTTPError as exc:
+        body = exc.read().decode("utf-8", errors="replace")
+        raise SystemExit(f"Graph API error {exc.code}: {body}") from None
+
+
+def _item_to_record(item: dict, since_dt: datetime) -> dict | None:
+    """Convert a drive item dict to an output record, or None if skipped."""
+    modified_str = item.get("lastModifiedDateTime")
+    if not modified_str:
         return None
-    modified_dt = drive_item.last_modified_date_time
-    if modified_dt.tzinfo is None:
-        modified_dt = modified_dt.replace(tzinfo=timezone.utc)
+    modified_dt = datetime.fromisoformat(modified_str.replace("Z", "+00:00"))
     if modified_dt < since_dt:
         return None
-    # Skip folders (only files have the 'file' facet)
-    if not drive_item.file:
+    # Skip folders
+    if "file" not in item:
         return None
 
     modified_by = None
-    if drive_item.last_modified_by and drive_item.last_modified_by.user:
-        modified_by = {
-            "displayName": drive_item.last_modified_by.user.display_name,
-            "id": drive_item.last_modified_by.user.id,
-        }
+    lmb = item.get("lastModifiedBy", {}).get("user")
+    if lmb:
+        modified_by = {"displayName": lmb.get("displayName"), "id": lmb.get("id")}
 
     parent_path = None
-    if drive_item.parent_reference:
-        parent_path = drive_item.parent_reference.path
+    pr = item.get("parentReference")
+    if pr:
+        parent_path = pr.get("path")
 
-    ts = modified_dt.isoformat()  # use the tz-aware modified_dt, not the raw attribute
-    name = drive_item.name or "(unknown)"
+    ts = modified_dt.isoformat()
+    name = item.get("name", "(unknown)")
     modifier = (modified_by or {}).get("displayName", "unknown user")
     summary = f"File modified: {name} by {modifier}"
 
     detail = {
-        "id": drive_item.id,
+        "id": item.get("id"),
         "name": name,
         "lastModifiedDateTime": ts,
-        "size": drive_item.size,
-        "webUrl": drive_item.web_url,
-        "mimeType": (
-            drive_item.file.mime_type if drive_item.file else None
-        ),
+        "size": item.get("size"),
+        "webUrl": item.get("webUrl"),
+        "mimeType": item.get("file", {}).get("mimeType"),
         "parentPath": parent_path,
         "lastModifiedBy": modified_by,
     }
     return build_output_item(source="sharepoint", ts=ts, summary=summary, detail=detail)
 
 
-async def _fetch_modified_files(since_dt: datetime, site_id: str | None) -> list[dict]:
-    client = get_client()
+def _fetch_modified_files(since_dt: datetime, site_id: str | None) -> list[dict]:
+    credential = _build_credential()
     items: list[dict] = []
 
+    select = "id,name,lastModifiedDateTime,size,webUrl,file,createdBy,lastModifiedBy,parentReference"
     if site_id:
-        # SharePoint site: use /delta to enumerate all recently modified items.
-        # delta() provides consistent, change-tracking semantics.
         url = (
             _GRAPH_BASE
             + f"/sites/{site_id}/drive/root/delta?"
-            + urllib.parse.urlencode({
-                "$select": "id,name,lastModifiedDateTime,size,webUrl,file,createdBy,lastModifiedBy,parentReference",
-                "$top": "100",
-            })
+            + urllib.parse.urlencode({"$select": select, "$top": "100"})
         )
-        result = await client.sites.by_site_id(site_id).drive.root.delta().with_url(url).get()
     else:
-        # Personal OneDrive: /me/drive/recent returns recently viewed/modified items
-        # with strong consistency, unlike search(q='') which has eventual consistency.
         url = (
             _GRAPH_BASE
             + "/me/drive/recent?"
-            + urllib.parse.urlencode({
-                "$select": "id,name,lastModifiedDateTime,size,webUrl,file,createdBy,lastModifiedBy,parentReference",
-                "$top": "100",
-            })
+            + urllib.parse.urlencode({"$select": select, "$top": "100"})
         )
-        result = await client.me.drive.recent().with_url(url).get()
 
-    while result:
-        for drive_item in result.value or []:
-            record = _item_to_record(drive_item, since_dt)
+    data = _get(url, credential)
+    while True:
+        for raw_item in data.get("value", []):
+            record = _item_to_record(raw_item, since_dt)
             if record:
                 items.append(record)
-
-        # Pagination: follow @odata.nextLink if present
-        next_link = getattr(result, "odata_next_link", None)
+        next_link = data.get("@odata.nextLink")
         if not next_link:
             break
-        if site_id:
-            result = await client.sites.by_site_id(site_id).drive.root.delta().with_url(next_link).get()
-        else:
-            result = await client.me.drive.recent().with_url(next_link).get()
+        data = _get(next_link, credential)
 
     return items
 
@@ -132,7 +133,7 @@ def main() -> None:
     args = parser.parse_args()
 
     since_dt = compute_since_dt(args.since)
-    items = asyncio.run(_fetch_modified_files(since_dt, args.site_id))
+    items = _fetch_modified_files(since_dt, args.site_id)
 
     if not items:
         sys.exit(0)
