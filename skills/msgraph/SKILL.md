@@ -5,7 +5,7 @@ license: Apache-2.0
 compatibility: Requires Python 3.10+. Dependencies and Azure AD app are auto-configured on first run.
 metadata:
   author: octobots
-  version: "0.1.0"
+  version: "0.2.0"
   dependencies:
     pip:
       - msgraph-sdk

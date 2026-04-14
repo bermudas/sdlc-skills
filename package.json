@@ -1,6 +1,6 @@
 {
   "name": "sdlc-skills",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "SDLC agents and skills for Claude Code, Cursor, Windsurf, and GitHub Copilot. Installable via Claude plugin marketplace or npx for direct install into .claude/agents.",
   "type": "module",
   "bin": {
