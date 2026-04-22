@@ -22,38 +22,41 @@ Two consumers:
 flowchart TB
     subgraph sdlc["sdlc-skills — content + install resolution"]
         direction TB
-        agents["agents/<br/>self-describing personas"]
-        skills["skills/<br/>monorepo skills"]
-        registry["skills.json<br/>catalog: monorepo + external"]
-        installer["bin/init.mjs<br/>npx installer"]
+        agents[/"agents/<br/>self-describing personas"/]
+        skills[/"skills/<br/>monorepo skills"/]
+        registry[("skills.json<br/>catalog: monorepo + external")]
+        installer(["bin/init.mjs<br/>npx installer"])
         agents --- skills
         skills --- registry
         registry --- installer
     end
 
-    ides["Stock AI IDEs<br/>Claude Code • Cursor<br/>Gemini CLI • Copilot CLI<br/>Windsurf"]
+    subgraph consumers["consumers"]
+        direction LR
+        ides["Stock AI IDEs<br/>Claude Code • Cursor<br/>Gemini CLI • Copilot CLI<br/>Windsurf"]
+        octobots["Octobots supervisor<br/>tmux TUI • taskbox<br/>scheduler • per-role clones"]
+    end
 
-    octobots["Octobots supervisor<br/>tmux TUI • taskbox<br/>scheduler • per-role clones"]
+    subgraph externals["upstream external skill sources"]
+        direction LR
+        ext_matt[["mattpocock/skills<br/>tdd"]]
+        ext_obra[["obra/superpowers<br/>brainstorming, debugging,<br/>verification, ..."]]
+        ext_tws[["twostraws/*-Agent-Skill<br/>SwiftUI, SwiftData,<br/>Swift Testing, Concurrency"]]
+    end
 
-    ext_matt["mattpocock/skills<br/>tdd"]
-    ext_obra["obra/superpowers<br/>brainstorming, debugging,<br/>verification, ..."]
-    ext_tws["twostraws/*-Agent-Skill<br/>SwiftUI, SwiftData,<br/>Swift Testing, Concurrency"]
+    installer ==>|fetch at install time| ext_matt
+    installer ==>|fetch at install time| ext_obra
+    installer ==>|fetch at install time| ext_tws
 
-    installer -->|fetch at install time| ext_matt
-    installer -->|fetch at install time| ext_obra
-    installer -->|fetch at install time| ext_tws
-
-    sdlc -->|direct install via<br/>plugin manifest or npx| ides
-    sdlc -->|install.sh delegates<br/>content to npx| octobots
+    sdlc ==>|direct install via<br/>plugin manifest or npx| ides
+    sdlc ==>|install.sh delegates<br/>content to npx| octobots
     octobots -.->|spawns agents in<br/>.claude/ runtime| ides
-
-    classDef layer fill:#e8f0ff,stroke:#3b5bdb,stroke-width:2px
-    classDef external fill:#fff4e6,stroke:#f08c00,stroke-width:1.5px
-    classDef consumer fill:#e6fcf5,stroke:#0ca678,stroke-width:1.5px
-    class sdlc layer
-    class ext_matt,ext_obra,ext_tws external
-    class ides,octobots consumer
 ```
+
+(Node shapes convey grouping so colors aren't needed: `/ /` parallelograms
+for content dirs, `( )` round-ended for the installer, cylinders for the
+registry, `[[ ]]` subroutines for external sources. GitHub's Mermaid
+renderer uses theme-adaptive colors in both light and dark mode.)
 
 Agents are **self-describing** — each `agents/<name>/AGENT.md` carries
 its own metadata (role, group, theme, aliases, skills, model). Octobots
