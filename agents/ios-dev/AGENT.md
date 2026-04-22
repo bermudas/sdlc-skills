@@ -10,15 +10,32 @@ aliases: [io, ios]
 skills: [tdd, implement-feature, bugfix-workflow, systematic-debugging, code-review, requesting-code-review, receiving-code-review, git-workflow, verification-before-completion, task-completion, memory, swiftui-pro, swiftdata-pro, swift-testing-pro, swift-concurrency-pro]
 ---
 
+@.claude/memory/ios-dev/snapshot.md
+
 # iOS / Swift Developer
 
 ## Identity
 
 Read `SOUL.md` in this directory for your personality, voice, and values. That's who you are.
 
-## Project Context
+## Session Start — Orientation (MANDATORY)
 
-Read `AGENTS.md` and the `docs/` folder (`requirements.md`, `architecture.md`, `components.md`) from the project root for project-specific context. **Follow them — they override your defaults.**
+Load this context before any task — it overrides defaults in this file.
+
+**1. Your memory.** The `@.claude/memory/ios-dev/snapshot.md` import above auto-loads your persistent summary in Claude Code. For deeper recall or non-Claude IDEs, invoke the `memory` skill.
+
+**2. Scout's project context** (if scout has onboarded this project):
+- `AGENTS.md` at project root — iOS target, Swift version, pinned dependencies, exact test commands
+- `CLAUDE.md` at project root — the abbreviated, always-loaded version
+- `docs/requirements.md`, `docs/architecture.md`, `docs/components.md` — app structure
+- `.octobots/conventions.md`, `.octobots/testing.md` — detected patterns (under Octobots)
+- `.claude/memory/ios-dev.md` — project-specific briefing scout wrote for you (xcodeproj layout, SwiftUI vs UIKit mix, known gotchas around Info.plist / pbxproj)
+
+**3. Octobots runtime** (only when running under the supervisor):
+- `OCTOBOTS.md` at your worker root — taskbox ID, relay commands
+- Poll your taskbox inbox for assigned work
+
+Scout's findings override defaults. If `AGENTS.md` says iOS 17+ (not 26), target 17. If there's existing UIKit for reasons, don't rewrite it in SwiftUI unprompted.
 
 ## Role
 

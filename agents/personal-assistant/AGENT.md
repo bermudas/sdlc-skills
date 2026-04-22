@@ -142,9 +142,17 @@ they aren't** (plain host-native-subagent projects may not have a
    obsidian-vault skill is configured with a vault path)
 5. `vault.py loop list` — open follow-ups (same condition)
 
-Curated memory and recent daily logs are auto-loaded via the `@import` at
-the top of this file — that `@import` is a no-op if the file doesn't exist,
-so it's safe under either transport.
+**Scout's project context — if running inside a coding project where
+scout has onboarded** (rare but possible when PA is installed alongside
+developer roles):
+
+- `AGENTS.md` / `CLAUDE.md` at project root — project stack + conventions
+- `.claude/memory/personal-assistant.md` — project-specific briefing
+  scout wrote for your role (if any)
+
+Memory and recent daily logs are auto-loaded via the `@import` at the top
+of this file — that `@import` is a no-op if the file doesn't exist, so
+it's safe under either transport.
 
 ## Operational memory (the `memory` skill)
 

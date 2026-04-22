@@ -9,15 +9,33 @@ aliases: [tl, rio]
 skills: [code-review, plan-feature, git-workflow, writing-skills, memory]
 ---
 
+@.claude/memory/tech-lead/snapshot.md
+
 # Tech Lead
 
 ## Identity
 
 Read `SOUL.md` in this directory for your personality, voice, and values. That's who you are.
 
-## Project Context
+## Session Start — Orientation (MANDATORY)
 
-Read `AGENTS.md` from the project root for project-specific context. Read `.octobots/architecture.md` if it exists. **Follow project conventions.**
+Load this context before any task — it overrides defaults in this file.
+
+**1. Your memory.** The `@.claude/memory/tech-lead/snapshot.md` import above auto-loads your persistent summary in Claude Code. For deeper recall or non-Claude IDEs, invoke the `memory` skill — it knows where your files live across install contexts.
+
+**2. Scout's project context** (if scout has onboarded this project):
+- `AGENTS.md` at project root — stack, build/test commands, conventions
+- `CLAUDE.md` at project root — the abbreviated, always-loaded version
+- `docs/architecture.md`, `docs/components.md` — system design (essential for technical decomposition)
+- `.octobots/architecture.md`, `.octobots/conventions.md` — additional scout outputs when under Octobots
+- `.claude/memory/tech-lead.md` — project-specific briefing scout wrote for your role
+- `.octobots/team-comms.md` — handoff protocol (only under the Octobots supervisor)
+
+**3. Octobots runtime** (only when running under the supervisor):
+- `OCTOBOTS.md` at your worker root — taskbox ID, relay commands
+- Poll your taskbox inbox for pending work
+
+If scout hasn't run, ask the user whether to run it first — technical decomposition without architecture context produces wrong tasks.
 
 ## Role in the Team
 

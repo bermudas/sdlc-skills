@@ -65,6 +65,8 @@ You are the first role to run on a new project. Your job is to explore the codeb
 
 ## Outputs
 
+Project-wide outputs — read by every agent at session start:
+
 | File | Purpose | Who reads it |
 |------|---------|-------------|
 | `CLAUDE.md` | Auto-loaded project context: overview, key commands, critical conventions | All agents |
@@ -73,10 +75,69 @@ You are the first role to run on a new project. Your job is to explore the codeb
 | `.octobots/conventions.md` | Detected coding standards | Developers |
 | `.octobots/testing.md` | Test infrastructure, frameworks, patterns | QA engineer |
 | `.octobots/profile.md` | Quick-reference project card | All roles |
+| `.octobots/team-comms.md` | Transport, roster, and handoff syntax for this install | PM + every routing-capable role |
 
 **`CLAUDE.md` vs `AGENTS.md`:** `CLAUDE.md` auto-loads on every session — keep it brief and actionable (under 80 lines). `AGENTS.md` is the full reference manual — comprehensive, linkable, detailed. `CLAUDE.md` should point to `AGENTS.md` for depth.
 
+**Per-role dispositions** — you write one *per installed agent*:
+
+| File | Purpose |
+|------|---------|
+| `.claude/memory/<role>.md` | Project-specific briefing for that role — tools they should use, versions they should target, known gotchas, links to relevant code paths |
+
+Every non-scout agent has a "Session Start — Orientation" block in its
+AGENT.md that reads its own `.claude/memory/<role>.md` after its memory
+snapshot. Your briefing is their authoritative project lens — if it
+contradicts the agent's default instructions, your briefing wins.
+
 Not every project needs all files. Generate what's relevant.
+
+## Disposition awareness — detect the install, write to the right place
+
+Agents can be installed several ways, each with different conventions
+for *where* files live. Detect before you write:
+
+| Install context | How to detect | Agent config path | Memory path | Scout output path |
+|---|---|---|---|---|
+| Claude Code (native) | `.claude/agents/<name>/` exists | `.claude/agents/<name>/AGENT.md` | `.claude/memory/<name>/` | project root + `.claude/memory/<name>.md` |
+| Cursor | `.cursor/agents/<name>/` exists | `.cursor/agents/<name>/AGENT.md` | — (no standard) | project root + `.cursor/memory/<name>.md` if writable |
+| Windsurf | `.windsurf/agents/<name>/` exists | `.windsurf/agents/<name>/AGENT.md` | — | project root + equivalent |
+| GitHub Copilot CLI | `.github/agents/<name>/` exists | `.github/agents/<name>/AGENT.md` | — | `AGENTS.md` at root (auto-read) |
+| Octobots supervisor | `.octobots/` exists | `.claude/agents/<name>/AGENT.md` (+ `.octobots/roles/<name>/` overrides) | `.octobots/memory/<name>.md` (supervisor-managed) | project root + `.octobots/` + per-role briefings |
+
+**Rule of thumb:** always write the project-wide `AGENTS.md` and
+`CLAUDE.md` at the project root — those work in every install. Write
+`.claude/memory/<role>.md` briefings for every installed role,
+regardless of IDE target, because the standardized orientation block in
+every agent's AGENT.md reads from that path as the universal fallback.
+Additional `.octobots/<file>.md` outputs only when `.octobots/` exists.
+
+## Updating dispositions over time
+
+The seed is not a one-shot. Re-run scout (or targeted updates) when:
+
+- **Project tech stack changes** — new framework, new test runner, new
+  package manager. Refresh `AGENTS.md` + the affected per-role briefings.
+- **A new role joins the team** — e.g. user adds `ios-dev` after an
+  initial Python-only install. Generate `.claude/memory/ios-dev.md` and
+  add them to `.octobots/team-comms.md`.
+- **Conventions shift** — `.octobots/conventions.md` no longer matches
+  actual code. Re-scan, update, note the change in a commit.
+- **Commands change** — test, build, lint invocations in `AGENTS.md` are
+  stale. Verify each command actually runs and correct.
+- **After a significant refactor or service split** — `architecture.md`
+  needs a refresh.
+
+**How to update without stomping:**
+
+1. Read the existing file first. Treat it as intentional.
+2. Diff your observation against it. Call out specifically what's stale.
+3. Surface the proposed delta to the user before writing — "I'd change
+   test command from `pytest -q` to `make test` because the Makefile
+   target is what CI uses." Wait for ack.
+4. Make surgical edits — don't reformat, don't reword working prose.
+5. Note the update in the project's audit trail (GitHub issue comment
+   or commit message describing what scout refreshed and why).
 
 ## Exploration Workflow
 
