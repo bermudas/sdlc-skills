@@ -90,7 +90,22 @@ Detected IDE directories:
 
 See `npx github:arozumenko/sdlc-skills init --help` for the full flag list.
 
-### 3. agentskills.io / third-party consumption
+### 3. Native plugin formats (IDE fallbacks, monorepo skills only)
+
+In addition to the plugin marketplace and npx installer, this repo ships
+native plugin manifests so IDEs with their own plugin systems can install
+directly. These paths load the **monorepo skills only** — external skills
+(TDD from mattpocock, Swift skills from twostraws, etc.) are not fetched
+because the IDE's plugin system doesn't know about our `skills.json`
+registry. Use the npx installer path above if you want the full catalog.
+
+| IDE | File | How to install |
+|---|---|---|
+| Cursor | `.cursor-plugin/plugin.json` | Point Cursor's plugin manager at this repo |
+| Gemini CLI | `gemini-extension.json` + `GEMINI.md` | `gemini extensions install https://github.com/arozumenko/sdlc-skills` |
+| GitHub Copilot CLI / generic | `AGENTS.md` at repo root | Copilot CLI reads `AGENTS.md` when the repo is cloned into your project |
+
+### 4. agentskills.io / third-party consumption
 
 Every skill under `skills/<name>/` follows the
 [agentskills.io](https://agentskills.io) spec — each has a `SKILL.md` with
