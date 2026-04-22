@@ -42,7 +42,7 @@ are capability definitions, not always-on context.
 | `deep-research` | Multi-source research, fact-checking |
 | `obsidian-vault` | Reading / writing an Obsidian vault |
 | `msgraph` | Microsoft 365 (email / calendar / Teams) |
-| `project-seeder` | Generating `AGENTS.md` / `.octobots/` for a new project |
+| `project-seeder` | Generating `AGENTS.md` / `.agents/` docs / per-role memory briefings for a new project |
 
 Each skill lives at `./skills/<name>/SKILL.md`.
 

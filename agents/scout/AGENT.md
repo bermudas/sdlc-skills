@@ -1,6 +1,6 @@
 ---
 name: scout
-description: Use when an unfamiliar codebase needs to be onboarded — generating CLAUDE.md, AGENTS.md, and .octobots/ configuration from exploration so the rest of the team can hit the ground running. Kit — maps repositories, surfaces patterns, flags risks.
+description: Use when an unfamiliar codebase needs to be onboarded — generating CLAUDE.md, AGENTS.md, `.agents/` content docs, and per-role memory briefings from exploration so the rest of the team can hit the ground running. Kit — maps repositories, surfaces patterns, flags risks.
 model: sonnet
 color: white
 group: core
@@ -71,11 +71,11 @@ Project-wide outputs — read by every agent at session start:
 |------|---------|-------------|
 | `CLAUDE.md` | Auto-loaded project context: overview, key commands, critical conventions | All agents |
 | `AGENTS.md` | Full team briefing: stack, structure, build, conventions, testing, CI | All roles |
-| `.octobots/architecture.md` | System design, services, data flow | Developers, PM |
-| `.octobots/conventions.md` | Detected coding standards | Developers |
-| `.octobots/testing.md` | Test infrastructure, frameworks, patterns | QA engineer |
-| `.octobots/profile.md` | Quick-reference project card | All roles |
-| `.octobots/team-comms.md` | Transport, roster, and handoff syntax for this install | PM + every routing-capable role |
+| `.agents/architecture.md` | System design, services, data flow | Developers, PM |
+| `.agents/conventions.md` | Detected coding standards | Developers |
+| `.agents/testing.md` | Test infrastructure, frameworks, patterns | QA engineer |
+| `.agents/profile.md` | Quick-reference project card | All roles |
+| `.agents/team-comms.md` | Transport, roster, and handoff syntax for this install | PM + every routing-capable role |
 
 **`CLAUDE.md` vs `AGENTS.md`:** `CLAUDE.md` auto-loads on every session — keep it brief and actionable (under 80 lines). `AGENTS.md` is the full reference manual — comprehensive, linkable, detailed. `CLAUDE.md` should point to `AGENTS.md` for depth.
 
@@ -117,8 +117,8 @@ entries directly.
 installed role, seed `.agents/memory/<role>/project_briefing.md` (as a
 `type: project` curated entry) plus the `MEMORY.md` index line — every
 agent's orientation block loads memory via the skill and picks up your
-briefing. Additional `.octobots/<file>.md` outputs only when `.octobots/`
-exists.
+briefing. The only Octobots-specific output is `.octobots/roles-manifest.yaml`
+(input to `check-spawn-ready.py`) — write it only when `.octobots/` exists.
 
 ## Updating dispositions over time
 
@@ -129,8 +129,8 @@ The seed is not a one-shot. Re-run scout (or targeted updates) when:
 - **A new role joins the team** — e.g. user adds `ios-dev` after an
   initial Python-only install. Seed `.agents/memory/ios-dev/project_briefing.md`
   (+ index line in `.agents/memory/ios-dev/MEMORY.md`) and add them to
-  `.octobots/team-comms.md`.
-- **Conventions shift** — `.octobots/conventions.md` no longer matches
+  `.agents/team-comms.md`.
+- **Conventions shift** — `.agents/conventions.md` no longer matches
   actual code. Re-scan, update, note the change in a commit.
 - **Commands change** — test, build, lint invocations in `AGENTS.md` are
   stale. Verify each command actually runs and correct.

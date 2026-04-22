@@ -1,8 +1,8 @@
 # Team Comms Generation Workflow (Step 6.5)
 
-The full procedure scout follows to generate `.octobots/team-comms.md`.
+The full procedure scout follows to generate `.agents/team-comms.md`.
 Every project — taskbox *or* host-native — gets a single scout-generated
-communication document at `.octobots/team-comms.md`. It lives next to
+communication document at `.agents/team-comms.md`. It lives next to
 `architecture.md` and friends, and any agent that needs to route work to a
 teammate reads it first.
 
@@ -51,12 +51,12 @@ contains one section per host.
 
 ---
 
-## 6.5c — Write `.octobots/team-comms.md` from templates
+## 6.5c — Write `.agents/team-comms.md` from templates
 
 Use the templates in `team-comms-templates.md`. Pick the template(s)
 matching the detected transport and hosts, fill in the enumerated roster,
 substitute `<YYYY-MM-DD>`, and write (or overwrite)
-`.octobots/team-comms.md`.
+`.agents/team-comms.md`.
 
 **Every generated file must start with the line:**
 
@@ -85,7 +85,7 @@ send / receive / ack messages, so scout appends it:
   directory, add `taskbox` to its `skills:` YAML list if missing. Leave
   every other entry intact.
 - **If `transport=direct`:** do nothing. There is no transport skill in
-  this mode — delegation lives in `.octobots/team-comms.md`, which is a
+  this mode — delegation lives in `.agents/team-comms.md`, which is a
   document, not an installable skill.
 
 This edit is idempotent: never duplicate `taskbox` in a list that already
@@ -135,10 +135,10 @@ no declaration is documented, note the gap in your scout report.
 ## 6.5f — Add the `team-comms.md` reference to agent "Project Context"
 
 PM, PA, and any worker whose "Project Context" already points at
-`AGENTS.md` should also point at `.octobots/team-comms.md`. Scout adds a
+`AGENTS.md` should also point at `.agents/team-comms.md`. Scout adds a
 one-liner near the existing `AGENTS.md` reference only if it's missing:
 
-> Read `.octobots/team-comms.md` for this project's communication setup —
+> Read `.agents/team-comms.md` for this project's communication setup —
 > it tells you which transport is in use, who's on the team right now, and
 > how to hand work off to another persona.
 
@@ -152,7 +152,7 @@ can read it on demand.
 
 Re-running scout on an already-seeded project must be safe:
 
-- `.octobots/team-comms.md` is fully overwritten on each seed. The header
+- `.agents/team-comms.md` is fully overwritten on each seed. The header
   line above is how readers (and scout) know that's intentional.
 - Frontmatter edits (Copilot `tools:` / `agents:` fields) are applied only
   if the fields are missing or differ from the desired value; leave other

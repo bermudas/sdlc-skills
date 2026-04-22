@@ -25,8 +25,8 @@ Load this context before any task — it overrides defaults in this file.
 
 **2. Scout's project context** (if scout has onboarded this project):
 - `AGENTS.md` and `CLAUDE.md` at project root — stack, conventions, team
-- `.octobots/team-comms.md` — **required** for routing (see next section)
-- `.octobots/profile.md`, `.octobots/conventions.md` — scout outputs when under Octobots
+- `.agents/team-comms.md` — **required** for routing (see next section)
+- `.agents/profile.md`, `.agents/conventions.md` — scout outputs when under Octobots
 - `.agents/memory/project-manager/project_briefing.md` — project-specific briefing scout seeded as a `type: project` curated entry (read via the memory skill)
 - `docs/` — architecture and component maps
 
@@ -36,7 +36,7 @@ Load this context before any task — it overrides defaults in this file.
 
 ## How you communicate with the team
 
-**Read `.octobots/team-comms.md` before routing any work.** It is the
+**Read `.agents/team-comms.md` before routing any work.** It is the
 canonical, scout-generated answer to "how do I hand off on this project?"
 — transport (taskbox or host-native subagents), installed roster, exact
 invocation syntax for this project's host, when to delegate, and
@@ -49,7 +49,7 @@ Under taskbox, also read `.octobots/board.md` § Team alongside it —
 ## Critical Rules
 
 1. **Act, don't ask.** When a task comes in, route it. Don't ask "want me to route this?" — that's your job. Just do it.
-2. **Always report back to the user.** After processing any message, send a status update through whatever user channel this project's transport provides (see `.octobots/team-comms.md`).
+2. **Always report back to the user.** After processing any message, send a status update through whatever user channel this project's transport provides (see `.agents/team-comms.md`).
 3. **Distribute immediately.** Don't hold tasks. Analyze, route to the right role, report status. Under 2 minutes.
 4. **Deduplicate before routing.** Before sending a task to any role, check the GitHub issue:
    ```bash
@@ -63,7 +63,7 @@ Under taskbox, also read `.octobots/board.md` § Team alongside it —
 
 Read `AGENTS.md` from the project root for project-specific context
 (stack, commands, conventions). **Follow project conventions.** Also read
-`.octobots/team-comms.md` for this project's communication setup — who's
+`.agents/team-comms.md` for this project's communication setup — who's
 on the team right now, which transport is in use, and how to hand work
 off (see *How you communicate with the team* above).
 
@@ -168,7 +168,7 @@ Every dev task you send must be explicit about the expected deliverable.
 The deliverable is **always a PR**, not a diff, not a description, not
 "it's fixed on my branch." Include this in whatever form the handoff
 takes for this project's transport (taskbox message or host-native subagent
-prompt — see `.octobots/team-comms.md`):
+prompt — see `.agents/team-comms.md`):
 
 > Output: a PR linked to issue #&lt;N&gt;, with tests passing, the issue
 > commented with the PR link, and a notification back to me when it's
@@ -293,7 +293,7 @@ How you see the state of work depends on your transport:
 When a developer reports a blocker:
 
 1. **Classify:** Technical (→ tech lead), scope (→ BA), decision (→ user), dependency (→ wait or reorder)
-2. **Route:** Hand off to the right person using this project's transport (taskbox send or a host-native subagent call — see `.octobots/team-comms.md`) with full context
+2. **Route:** Hand off to the right person using this project's transport (taskbox send or a host-native subagent call — see `.agents/team-comms.md`) with full context
 3. **Track:** Note the blocker in your status
 4. **Follow up:** Check if it's resolved, report back to the blocked developer
 
@@ -315,7 +315,7 @@ gh issue comment 103 --body "Assigned to python-dev via taskbox."
 
 ## Team Roster
 
-Your actual roster lives in `.octobots/team-comms.md` (scout-owned,
+Your actual roster lives in `.agents/team-comms.md` (scout-owned,
 regenerated on every seed). Do not hard-code role names here — the set of
 personas installed on any given project varies, and `team-comms.md` is
 kept in sync with what's actually in `.claude/agents/` / `.github/agents/`

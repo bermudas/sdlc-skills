@@ -152,7 +152,7 @@ Setup: `cp .env.example .env` and fill in values.
 
 ---
 
-## .octobots/profile.md Template
+## .agents/profile.md Template
 
 ```markdown
 ---
@@ -183,7 +183,7 @@ Brief description.
 
 ---
 
-## .octobots/architecture.md Template
+## .agents/architecture.md Template
 
 ```markdown
 # Architecture
@@ -235,7 +235,7 @@ User → Frontend (Next.js) → API Gateway (FastAPI) → Database (PostgreSQL)
 
 ---
 
-## .octobots/conventions.md Template
+## .agents/conventions.md Template
 
 ```markdown
 # Coding Conventions
@@ -279,7 +279,7 @@ Detected from codebase analysis. These are descriptive (what IS), not prescripti
 
 ---
 
-## .octobots/testing.md Template
+## .agents/testing.md Template
 
 ```markdown
 # Test Infrastructure
@@ -436,7 +436,7 @@ do here? Examples:
 
 - qa-engineer on a GUT project:
   "Tests use GUT framework (Godot addon, not installed yet — see issue #42).
-   Run from Godot editor or CLI. Phase 1 DoD checklist is in .octobots/testing.md."
+   Run from Godot editor or CLI. Phase 1 DoD checklist is in .agents/testing.md."
 
 - project-manager on any project:
   "Coordinate Phase 1 work: [N] issues, deadline [date]. Unblock: [first issue]."

@@ -214,9 +214,10 @@ Present a complete plan of what will be written or modified before touching any 
 
 Files to UPDATE:   CLAUDE.md (fix [N] drift items)
 Files to CREATE:   AGENTS.md
-                   .octobots/{profile, architecture, conventions, testing}.md
-                   .octobots/roles-manifest.yaml
-                   .octobots/onboarding.md
+                   .agents/{profile, architecture, conventions, testing, team-comms}.md
+                   .agents/memory/<role>/project_briefing.md (per role)
+                   .agents/onboarding.md
+                   .octobots/roles-manifest.yaml (Octobots-only)
 
 Roles to tune:     python-dev → [Persona] ([new focus])
                    js-dev → [Persona] ([new focus])
@@ -242,15 +243,15 @@ Execute everything approved in Phase 6. Report each file as you generate it: `�
 `sdlc-skills/skills/project-seeder/SKILL.md` for the generation flow, and
 the skill's `references/` directory for templates:
 
-- `references/templates.md` — CLAUDE.md / AGENTS.md / profile / conventions / testing / architecture templates, plus `.octobots/roles-manifest.yaml` and role-memory-seeding templates
-- `references/team-comms-templates.md` — `.octobots/team-comms.md` templates by host
+- `references/templates.md` — CLAUDE.md / AGENTS.md / `.agents/{profile, architecture, conventions, testing}.md` templates, plus `.octobots/roles-manifest.yaml` and per-role `project_briefing.md` memory-seeding templates
+- `references/team-comms-templates.md` — `.agents/team-comms.md` templates by host
 - `references/team-comms-workflow.md` — full Step 6.5 detection & generation procedure
 - `references/role-customization.md` — Step 7 persona/SOUL.md repurposing procedure
 
 **7a — Generate config files:**
 1. `CLAUDE.md` first — **sensitive.** If it already exists: surgical edits only — fix drift items approved in Phase 5.75, nothing else. If it doesn't exist: create from template. Never restructure or reword prose.
 2. `AGENTS.md` — full reference, linked from CLAUDE.md. Update, don't overwrite.
-3. `.octobots/` files as needed (profile, architecture, conventions, testing).
+3. `.agents/` content files as needed (profile, architecture, conventions, testing, team-comms).
 
 `CLAUDE.md` lives at the project root. It is symlinked into worker workspaces by the supervisor at launch.
 
@@ -269,7 +270,7 @@ template in `skills/project-seeder/references/templates.md`. Write "My
 Role Focus" based on your actual understanding of what that role does on
 this project — not placeholder text.
 
-**7e — Generate `.octobots/team-comms.md`:**
+**7e — Generate `.agents/team-comms.md`:**
 Run the full procedure in `skills/project-seeder/references/team-comms-workflow.md` (substeps 6.5a–6.5g). Every project gets a `team-comms.md`, taskbox and host-native alike; PM and PA point at it for all routing decisions.
 
 **Legacy marker cleanup.** Earlier iterations of this design used `<!-- SCOUT:TEAM-ROSTER:BEGIN -->` / `END` markers inside agent files. Those are gone. If a re-run encounters one, strip the marker block cleanly and log what you removed.
@@ -311,7 +312,7 @@ Print results as a numbered checklist. If any **critical** check fails, list wha
 
 Three outputs, in order:
 
-**1. Create `.octobots/onboarding.md`** — the persistent audit trail:
+**1. Create `.agents/onboarding.md`** — the persistent audit trail:
 - Date, what was found (stack, stage, issues count, GDD presence)
 - What was generated/modified (file list)
 - Which roles were tuned and why
@@ -321,7 +322,7 @@ Three outputs, in order:
 
 **2. Create GitHub issue** — "Onboarding [date]" with the same content as onboarding.md:
 ```bash
-gh issue create --title "Onboarding [date]" --body "$(cat .octobots/onboarding.md)"
+gh issue create --title "Onboarding [date]" --body "$(cat .agents/onboarding.md)"
 ```
 If `gh` is unavailable, warn and skip — don't fail the session.
 

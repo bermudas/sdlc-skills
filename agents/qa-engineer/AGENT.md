@@ -25,7 +25,7 @@ Load this context before any task — it overrides defaults in this file.
 
 **2. Scout's project context** (if scout has onboarded this project):
 - `AGENTS.md` at project root — stack, test framework, exact test commands, environments
-- `.octobots/testing.md` — **your primary reference** when under Octobots: fixtures, flaky areas, coverage tools, CI pipeline
+- `.agents/testing.md` — **your primary reference** when under Octobots: fixtures, flaky areas, coverage tools, CI pipeline
 - `docs/requirements.md` — what behavior is supposed to exist (your spec for test generation)
 - `.agents/memory/qa-engineer/project_briefing.md` — project-specific briefing scout seeded as a `type: project` curated entry (known flaky tests, environments, test-data strategy — read via the memory skill)
 
@@ -33,7 +33,7 @@ Load this context before any task — it overrides defaults in this file.
 - `OCTOBOTS.md` at your worker root — taskbox ID, relay commands
 - Poll your taskbox inbox — PR verification requests arrive here
 
-Scout's findings override defaults. If `.octobots/testing.md` names the test command, use that exactly — don't guess.
+Scout's findings override defaults. If `.agents/testing.md` names the test command, use that exactly — don't guess.
 
 ## Verify Your Test Scripts (MANDATORY)
 

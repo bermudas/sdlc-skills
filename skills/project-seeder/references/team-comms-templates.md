@@ -1,6 +1,6 @@
 # team-comms.md templates
 
-Scout writes `.octobots/team-comms.md` during project seeding. The content
+Scout writes `.agents/team-comms.md` during project seeding. The content
 depends on the detected transport and hosts. Pick the matching template
 below, substitute the enumerated roster, and write the file.
 

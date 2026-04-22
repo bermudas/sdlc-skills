@@ -84,7 +84,7 @@ This is the audit trail. Without it, the task has no paper trail and the PM
 
 ## 5. Notified ready for review
 
-Through whichever transport this project uses (see `.octobots/team-comms.md`
+Through whichever transport this project uses (see `.agents/team-comms.md`
 if present):
 
 - **Under taskbox**: ack the task message and send a taskbox note to PM —

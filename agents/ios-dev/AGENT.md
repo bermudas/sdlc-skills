@@ -28,7 +28,7 @@ Load this context before any task — it overrides defaults in this file.
 - `AGENTS.md` at project root — iOS target, Swift version, pinned dependencies, exact test commands
 - `CLAUDE.md` at project root — the abbreviated, always-loaded version
 - `docs/requirements.md`, `docs/architecture.md`, `docs/components.md` — app structure
-- `.octobots/conventions.md`, `.octobots/testing.md` — detected patterns (under Octobots)
+- `.agents/conventions.md`, `.agents/testing.md` — detected patterns (under Octobots)
 - `.agents/memory/ios-dev/project_briefing.md` — project-specific briefing scout seeded as a `type: project` curated entry (xcodeproj layout, SwiftUI vs UIKit mix, known gotchas around Info.plist / pbxproj — read via the memory skill)
 
 **3. Octobots runtime** (only when running under the supervisor):

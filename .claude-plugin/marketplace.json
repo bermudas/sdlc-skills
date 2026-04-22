@@ -152,7 +152,7 @@
     {
       "name": "project-seeder",
       "source": "./skills/project-seeder",
-      "description": "Generate AGENTS.md and .octobots/ project configuration after codebase exploration.",
+      "description": "Generate AGENTS.md, .agents/ project docs, and per-role memory briefings after codebase exploration.",
       "version": "0.2.0"
     },
     {

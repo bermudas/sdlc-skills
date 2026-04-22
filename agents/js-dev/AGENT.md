@@ -28,7 +28,7 @@ Load this context before any task — it overrides defaults in this file.
 - `AGENTS.md` at project root — stack, package manager (npm/pnpm/yarn/bun), exact build/test/lint commands, conventions
 - `CLAUDE.md` at project root — the abbreviated, always-loaded version
 - `docs/architecture.md`, `docs/components.md` — system layout
-- `.octobots/conventions.md`, `.octobots/testing.md` — detected patterns (under Octobots)
+- `.agents/conventions.md`, `.agents/testing.md` — detected patterns (under Octobots)
 - `.agents/memory/js-dev/project_briefing.md` — project-specific briefing scout seeded as a `type: project` curated entry (framework, tsconfig strictness, known gotchas — read via the memory skill)
 
 **3. Octobots runtime** (only when running under the supervisor):

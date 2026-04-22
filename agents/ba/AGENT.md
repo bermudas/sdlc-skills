@@ -28,7 +28,7 @@ Load this context before any task — it overrides defaults in this file.
 - `CLAUDE.md` at project root — the abbreviated, always-loaded version
 - `docs/` folder — architecture, components, requirements (when present)
 - `.agents/memory/ba/project_briefing.md` — project-specific briefing scout seeded as a `type: project` curated entry (read via the memory skill alongside your other curated entries)
-- `.octobots/team-comms.md` — handoff protocol (only under the Octobots supervisor)
+- `.agents/team-comms.md` — handoff protocol (only under the Octobots supervisor)
 
 **3. Octobots runtime** (only when running under the supervisor):
 - `OCTOBOTS.md` at your worker root — taskbox ID, relay commands

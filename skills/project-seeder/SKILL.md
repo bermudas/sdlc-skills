@@ -18,19 +18,20 @@ Generate the configuration files that octobots roles need to work in a project.
 project-root/
 ├── CLAUDE.md                     ← Auto-loaded by Claude Code: brief project context
 ├── AGENTS.md                     ← Full team reference: stack, commands, conventions
-└── .octobots/
-    ├── profile.md                ← Quick-reference project card
-    ├── team-comms.md             ← Who's on the team and how to route work (Step 6.5)
-    ├── architecture.md           ← System design map (if complex enough)
-    ├── conventions.md            ← Detected coding standards
-    ├── testing.md                ← Test infrastructure details
+├── .agents/                      ← IDE-neutral agent content (every agent reads)
+│   ├── profile.md                ← Quick-reference project card
+│   ├── team-comms.md             ← Who's on the team and how to route work (Step 6.5)
+│   ├── architecture.md           ← System design map (if complex enough)
+│   ├── conventions.md            ← Detected coding standards
+│   ├── testing.md                ← Test infrastructure details
+│   ├── onboarding.md             ← Scout's own audit trail (Phase 10)
+│   └── memory/<role-id>/
+│       ├── MEMORY.md             ← Index (add a line for each entry)
+│       └── project_briefing.md   ← Per-role project briefing scout seeds
+│                                   as a `type: project` curated entry
+│                                   per the `memory` skill spec (Step 7c)
+└── .octobots/                    ← Octobots supervisor runtime state (only if Octobots is installed)
     └── roles-manifest.yaml       ← Input for spawn readiness check (Step 7b)
-
-.agents/memory/<role-id>/
-    ├── MEMORY.md                 ← Index (add a line for each entry below)
-    └── project_briefing.md       ← Per-role project briefing scout seeds
-                                    as a `type: project` curated entry
-                                    per the `memory` skill spec (Step 7c)
 ```
 
 Not every project needs all files. Skip what's not relevant.
@@ -43,7 +44,7 @@ The step-by-step templates and detailed procedures live alongside this SKILL.md:
   every generated file (CLAUDE.md / AGENTS.md / profile / conventions /
   testing / architecture / roles-manifest.yaml / role-memory seeding)
 - **[references/team-comms-templates.md](references/team-comms-templates.md)**
-  — `.octobots/team-comms.md` templates by host (taskbox, Claude, Copilot,
+  — `.agents/team-comms.md` templates by host (taskbox, Claude, Copilot,
   Cursor, Windsurf)
 - **[references/team-comms-workflow.md](references/team-comms-workflow.md)**
   — full Step 6.5 detection and generation procedure (6.5a–6.5g)
@@ -78,8 +79,8 @@ commands (install, dev, test), critical conventions, key paths (entry
 points, test dirs, config files), a pointer to `AGENTS.md` for full detail.
 
 **What does NOT belong here:** exhaustive command lists (that's AGENTS.md),
-full architecture diagrams (`.octobots/architecture.md`), long convention
-catalogues (`.octobots/conventions.md`).
+full architecture diagrams (`.agents/architecture.md`), long convention
+catalogues (`.agents/conventions.md`).
 
 ## Step 2: Generate AGENTS.md
 
@@ -97,33 +98,33 @@ codebase), testing (framework, commands, patterns), CI/CD, environment.
 - Note inconsistencies: "README says `npm test` but CI runs `npx jest --ci`"
 - Keep it under 200 lines. Link to `.octobots/` files for details.
 
-## Step 3: Generate .octobots/profile.md
+## Step 3: Generate .agents/profile.md
 
 Quick-reference card with YAML frontmatter (project, team, issue-tracker,
 default-branch, languages). See `references/templates.md`.
 
-## Step 4: Generate .octobots/conventions.md (if patterns detected)
+## Step 4: Generate .agents/conventions.md (if patterns detected)
 
 Only create if you found clear patterns. Document what IS, not what should
 be. Cover naming, import ordering, error handling, code organization,
 comment/doc style.
 
-## Step 5: Generate .octobots/architecture.md (if complex)
+## Step 5: Generate .agents/architecture.md (if complex)
 
 Only for multi-service or non-trivial architectures: service/component map,
 data flow, API boundaries, database schema overview, infrastructure diagram
 (text-based).
 
-## Step 6: Generate .octobots/testing.md (if test infra exists)
+## Step 6: Generate .agents/testing.md (if test infra exists)
 
 QA engineer reads this. Include test framework and config, how to run
 tests (exact commands), fixture/setup patterns, test data strategy, CI
 test pipeline, coverage tools, known flaky areas.
 
-## Step 6.5: Generate `.octobots/team-comms.md`
+## Step 6.5: Generate `.agents/team-comms.md`
 
 Every project — taskbox *or* host-native — gets a scout-generated
-`.octobots/team-comms.md` that names the transport, the installed
+`.agents/team-comms.md` that names the transport, the installed
 personas, and the exact invocation syntax.
 
 Full procedure — host detection, persona enumeration, template selection,
@@ -148,7 +149,7 @@ After generating, verify:
 
 ```bash
 # Core files exist
-ls CLAUDE.md AGENTS.md .octobots/profile.md
+ls CLAUDE.md AGENTS.md .agents/profile.md
 
 # CLAUDE.md is brief (auto-loaded — must not be bloated)
 wc -l CLAUDE.md  # should be under 80 lines
@@ -156,11 +157,11 @@ wc -l CLAUDE.md  # should be under 80 lines
 # AGENTS.md is readable
 wc -l AGENTS.md  # should be under 200 lines
 
-# No secrets leaked in either
-grep -ri "password\|secret\|token\|api_key" CLAUDE.md AGENTS.md .octobots/ || echo "clean"
+# No secrets leaked anywhere scout wrote
+grep -ri "password\|secret\|token\|api_key" CLAUDE.md AGENTS.md .agents/ .octobots/ 2>/dev/null || echo "clean"
 
-# roles-manifest.yaml generated (if roles were customized)
-ls .octobots/roles-manifest.yaml
+# roles-manifest.yaml generated under .octobots/ (if roles were customized and Octobots is in play)
+ls .octobots/roles-manifest.yaml 2>/dev/null
 
 # Memory files present and non-empty for all roles
 ls .agents/memory/
