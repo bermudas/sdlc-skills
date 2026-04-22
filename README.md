@@ -277,6 +277,20 @@ No build step, no CI-generated manifests. The installer discovers content
 by reading the directories at runtime — add a folder, it shows up in the
 next `init` run.
 
+## Acknowledgements
+
+This repo's external-skill integration pulls from excellent work by others,
+all under permissive licenses. If the installer resolves any of the
+following skills into your project, the content comes from these sources —
+please credit them accordingly:
+
+- **[`mattpocock/skills`](https://github.com/mattpocock/skills)** — Matt Pocock. We use the `tdd/` skill (vertical-slice tracer bullets, integration-style tests, interface design for testability). MIT.
+- **[`obra/superpowers`](https://github.com/obra/superpowers)** — Jesse Vincent (@obra). We use `brainstorming`, `systematic-debugging`, `verification-before-completion`, `requesting-code-review`, `receiving-code-review`, and `writing-skills`. MIT.
+- **Paul Hudson's Swift agent skills** ([twostraws/SwiftUI-Agent-Skill](https://github.com/twostraws/SwiftUI-Agent-Skill), [twostraws/SwiftData-Agent-Skill](https://github.com/twostraws/SwiftData-Agent-Skill), [twostraws/Swift-Testing-Agent-Skill](https://github.com/twostraws/Swift-Testing-Agent-Skill), [twostraws/Swift-Concurrency-Agent-Skill](https://github.com/twostraws/Swift-Concurrency-Agent-Skill)) — Paul Hudson. Powers the `ios-dev` agent's Swift expertise. MIT.
+
+Thanks to all maintainers. External skills are fetched from upstream at
+install time — this repo re-distributes nothing, only catalogs and wires.
+
 ## License
 
 MIT — see [LICENSE](./LICENSE).
