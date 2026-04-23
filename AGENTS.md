@@ -16,6 +16,9 @@ of native plugin formats and a shared npx installer.
   `git-workflow`, `memory`, `playwright-testing`, `browser-verify`,
   `issue-tracking`, `xray-testing`, `goal-verifier`, `context-gatherer`,
   `deep-research`, `obsidian-vault`, `msgraph`, `project-seeder`.
+  `issue-tracking`, `atlassian-content`, `goal-verifier`,
+  `context-gatherer`, `deep-research`, `obsidian-vault`, `msgraph`,
+  `project-seeder`.
 - **`skills.json`** — catalog of all skills, monorepo and external.
   The installer uses it to resolve + fetch external skills (from
   `mattpocock/skills`, `obra/superpowers`, `twostraws/*-Agent-Skill`).

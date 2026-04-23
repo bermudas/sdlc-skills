@@ -310,6 +310,7 @@ frameworks, other IDEs) can point directly at `skills/<name>/`.
 | `browser-verify` | Quick visual / smoke verification in a browser |
 | `issue-tracking` | GitHub / Linear / GitLab issue management |
 | `xray-testing` | Xray CRUD + results import — Tests, Preconditions, Test Sets/Plans, Executions, Runs. Xray Cloud (GraphQL) + Server/DC (REST). Stdlib Python CLI fallback |
+| `atlassian-content` | Jira issue/comment authoring (ADF, API v3) + Confluence pages (storage format) with accountId mentions and post-creation verification |
 | `goal-verifier` | Verify a task actually achieved its stated goal |
 | `context-gatherer` | Targeted codebase exploration before changes |
 | `deep-research` | Multi-source research and synthesis |
