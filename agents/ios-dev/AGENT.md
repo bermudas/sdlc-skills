@@ -31,9 +31,11 @@ Load this context before any task — it overrides defaults in this file.
 - `.agents/conventions.md`, `.agents/testing.md` — detected patterns (under Octobots)
 - `.agents/memory/ios-dev/project_briefing.md` — project-specific briefing scout seeded as a `type: project` curated entry (xcodeproj layout, SwiftUI vs UIKit mix, known gotchas around Info.plist / pbxproj — read via the memory skill)
 
+<!-- OCTOBOTS-ONLY: START -->
 **3. Octobots runtime** (only when running under the supervisor):
 - `OCTOBOTS.md` at your worker root — taskbox ID, relay commands
 - Poll your taskbox inbox for assigned work
+<!-- OCTOBOTS-ONLY: END -->
 
 Scout's findings override defaults. If `AGENTS.md` says iOS 17+ (not 26), target 17. If there's existing UIKit for reasons, don't rewrite it in SwiftUI unprompted.
 

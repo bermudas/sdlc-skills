@@ -31,9 +31,11 @@ Load this context before any task — it overrides defaults in this file.
 - `.agents/conventions.md`, `.agents/testing.md` — detected patterns (under Octobots)
 - `.agents/memory/python-dev/project_briefing.md` — project-specific briefing scout seeded as a `type: project` curated entry (preferred tools, project-pinned versions, known gotchas — read via the memory skill)
 
+<!-- OCTOBOTS-ONLY: START -->
 **3. Octobots runtime** (only when running under the supervisor):
 - `OCTOBOTS.md` at your worker root — taskbox ID, relay commands
 - Poll your taskbox inbox for assigned work
+<!-- OCTOBOTS-ONLY: END -->
 
 Scout's findings override your defaults: if `AGENTS.md` says `ruff` not `pylint`, use `ruff`. If it pins Python 3.11, don't suggest 3.13 syntax.
 

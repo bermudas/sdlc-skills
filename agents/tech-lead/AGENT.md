@@ -10,6 +10,7 @@ skills: [code-review, plan-feature, git-workflow, writing-skills, memory]
 ---
 
 @.agents/memory/tech-lead/snapshot.md
+@.agents/role-overrides.md
 
 # Tech Lead
 
