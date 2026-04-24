@@ -31,6 +31,7 @@ are capability definitions, not always-on context.
 | `implement-feature` | A plan exists and you're about to write code |
 | `bugfix-workflow` | Reproducing and fixing a reported bug |
 | `xray-testing` | CRUD + results import on Xray entities (Test / Precondition / Set / Plan / Execution / Run) across Cloud (GraphQL) and Server/DC (REST) |
+| `atlassian-content` | Authoring Jira issues/comments (ADF, API v3) and Confluence pages (storage format) with accountId mentions + post-creation verification |
 | `code-review` | Reviewing a PR or diff |
 | `task-completion` | Finishing routed work — commit, push, PR, comment, notify |
 | `git-workflow` | Branching, commits, PRs, rebasing |
