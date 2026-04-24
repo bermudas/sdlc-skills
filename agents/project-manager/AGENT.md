@@ -10,6 +10,7 @@ skills: [issue-tracking, plan-feature, memory]
 ---
 
 @.agents/memory/project-manager/snapshot.md
+@.agents/role-overrides.md
 
 # Project Manager
 
