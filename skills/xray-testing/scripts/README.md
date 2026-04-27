@@ -28,7 +28,34 @@ depending on where sdlc-skills installed.
 
 ## Configure via environment
 
-Deployment is auto-detected. Override with `XRAY_DEPLOYMENT=cloud|server`.
+Three ways to get credentials in. Pick one:
+
+```bash
+# (a) Interactive — writes/updates .env in cwd, mode 0600
+xray config set \
+    --client-id "$XRAY_ID" --client-secret "$XRAY_SECRET" \
+    --jira-base-url https://<site>.atlassian.net \
+    --jira-user you@example.com --jira-token <pat>
+
+# (b) Drop a .env file — auto-loaded by xray.py at startup
+cp <install-path>/skills/xray-testing/scripts/.env.example .env
+$EDITOR .env
+
+# (c) Pre-export in your shell / direnv / CI runner
+export XRAY_CLIENT_ID=… XRAY_CLIENT_SECRET=…
+```
+
+**Precedence**: already-exported env vars > `.env` in cwd > nothing.
+The script never overrides a value that's already in `os.environ`,
+so a stray `.env` won't surprise a CI run that exports its own vars.
+
+**Project-wide config** (e.g. `.agents/test-automation.yaml` from the
+project-seeder skill) is read by the agent — not by this script. The
+agent translates the YAML into env vars before invoking `xray`. The
+CLI itself only knows about env vars + `.env`.
+
+Deployment is auto-detected from the fields you set. Override with
+`XRAY_DEPLOYMENT=cloud|server`.
 
 **Cloud** (Xray Cloud):
 
@@ -70,14 +97,15 @@ Shared:
 # export XRAY_CACHE_DIR=".xray-cache"
 ```
 
-Never commit these values. Store in a local `.env` your runner
-sources, or in your shell profile.
+Never commit these values — `.env` and `token.json` should be in
+`.gitignore`. The CLI writes `.env` mode 0600 when you use
+`xray config set`.
 
 Sanity check:
 
 ```bash
-xray config
-xray auth-verify
+xray config              # show effective config (resolved env-vars + .env)
+xray auth-verify         # one-shot reachability check
 ```
 
 ## Command surface

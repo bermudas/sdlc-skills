@@ -96,7 +96,44 @@ def _die(msg: str, code: int = 2) -> None:
     sys.exit(code)
 
 
+def _load_dotenv(path: Path = Path(".env")) -> None:
+    """Populate os.environ from a .env file in cwd.
+
+    Already-exported env vars always win — `setdefault` never overrides.
+    Silent if the file doesn't exist; warns (does not fail) on parse errors.
+    Format: KEY=VALUE per line. Blank lines and `#` comments ignored.
+    Surrounding single or double quotes around the value are stripped.
+    Inline `# comment` after an unquoted value is stripped.
+    """
+    if not path.is_file():
+        return
+    try:
+        for lineno, raw in enumerate(path.read_text().splitlines(), 1):
+            line = raw.strip()
+            if not line or line.startswith("#"):
+                continue
+            if "=" not in line:
+                print(f"xray: {path}:{lineno}: skipping malformed line", file=sys.stderr)
+                continue
+            key, _, value = line.partition("=")
+            key = key.strip()
+            if key.startswith("export "):
+                key = key[len("export "):].strip()
+            value = value.strip()
+            if value and value[0] in ("'", '"') and value[-1] == value[0]:
+                value = value[1:-1]
+            else:
+                # Strip inline `# comment` only when value is unquoted
+                hash_at = value.find(" #")
+                if hash_at >= 0:
+                    value = value[:hash_at].rstrip()
+            os.environ.setdefault(key, value)
+    except OSError as e:
+        print(f"xray: could not read {path}: {e}", file=sys.stderr)
+
+
 def load_config() -> Config:
+    _load_dotenv()
     deployment = os.environ.get("XRAY_DEPLOYMENT", "").strip().lower()
     client_id = os.environ.get("XRAY_CLIENT_ID", "").strip()
     client_secret = os.environ.get("XRAY_CLIENT_SECRET", "").strip()
@@ -811,7 +848,22 @@ def build_parser() -> argparse.ArgumentParser:
                    help="emit JSON on stdout (default: human-readable).")
     sub = p.add_subparsers(dest="cmd", required=True)
 
-    sub.add_parser("config", help="print effective configuration.")
+    cfg_p = sub.add_parser("config", help="show or set effective configuration.")
+    cfg_sub = cfg_p.add_subparsers(dest="config_action")  # optional — default 'show'
+    cfg_sub.add_parser("show", help="print effective configuration.")
+    cfg_set = cfg_sub.add_parser("set", help="write/update .env in cwd.")
+    cfg_set.add_argument("--client-id", dest="client_id", help="XRAY_CLIENT_ID (cloud)")
+    cfg_set.add_argument("--client-secret", dest="client_secret", help="XRAY_CLIENT_SECRET (cloud)")
+    cfg_set.add_argument("--jira-base-url", dest="jira_base_url", help="JIRA_BASE_URL")
+    cfg_set.add_argument("--jira-user", dest="jira_user", help="JIRA_USER (atlassian email)")
+    cfg_set.add_argument("--jira-token", dest="jira_token", help="JIRA_TOKEN (Jira API token / PAT)")
+    cfg_set.add_argument("--xray-region", dest="xray_region", choices=["global", "us", "eu"], help="XRAY_REGION")
+    cfg_set.add_argument("--xray-base-url", dest="xray_base_url", help="XRAY_BASE_URL (override region)")
+    cfg_set.add_argument("--xray-deployment", dest="xray_deployment", choices=["cloud", "server"], help="XRAY_DEPLOYMENT")
+    cfg_set.add_argument("--xray-cache-dir", dest="xray_cache_dir", help="XRAY_CACHE_DIR")
+    cfg_set.add_argument("--env-file", dest="env_file", default=".env", help="target file (default: .env)")
+    cfg_set.add_argument("--print", dest="print_after", action="store_true", help="print masked summary after write")
+
     sub.add_parser("statuses", help="list project-allowed Test Run statuses.")
     sub.add_parser("auth-verify", help="one-shot API reachability check.")
 
@@ -877,10 +929,82 @@ def build_parser() -> argparse.ArgumentParser:
     return p
 
 
+_CONFIG_FIELDS: list[tuple[str, str]] = [
+    # (CLI dest, env var name) — order = .env write order
+    ("xray_deployment", "XRAY_DEPLOYMENT"),
+    ("client_id", "XRAY_CLIENT_ID"),
+    ("client_secret", "XRAY_CLIENT_SECRET"),
+    ("xray_region", "XRAY_REGION"),
+    ("xray_base_url", "XRAY_BASE_URL"),
+    ("jira_base_url", "JIRA_BASE_URL"),
+    ("jira_user", "JIRA_USER"),
+    ("jira_token", "JIRA_TOKEN"),
+    ("xray_cache_dir", "XRAY_CACHE_DIR"),
+]
+
+
+def cmd_config_set(args) -> None:
+    """Write/update the env-var file (default .env) in cwd.
+
+    Updates existing keys in place; appends new ones at the bottom under a
+    section header. Other lines (comments, unrelated vars) are preserved.
+    Mode is set to 0600 after write — credentials don't need to be readable
+    by other users.
+    """
+    target = Path(args.env_file)
+    updates: dict[str, str] = {}
+    for dest, env_var in _CONFIG_FIELDS:
+        v = getattr(args, dest, None)
+        if v is not None and v != "":
+            updates[env_var] = v
+    if not updates:
+        _die("no fields given — pass at least one of --client-id / --jira-token / etc.", 2)
+
+    existing = target.read_text() if target.is_file() else ""
+    lines = existing.splitlines()
+    seen: set[str] = set()
+    out: list[str] = []
+    for line in lines:
+        stripped = line.lstrip()
+        if "=" in stripped and not stripped.startswith("#"):
+            key = stripped.partition("=")[0].strip()
+            if key.startswith("export "):
+                key = key[len("export "):].strip()
+            if key in updates:
+                out.append(f"{key}={updates[key]}")
+                seen.add(key)
+                continue
+        out.append(line)
+
+    new_keys = [(k, v) for k, v in updates.items() if k not in seen]
+    if new_keys:
+        if out and out[-1].strip() != "":
+            out.append("")
+        out.append("# xray-testing — added by `xray config set`")
+        for k, v in new_keys:
+            out.append(f"{k}={v}")
+
+    body = "\n".join(out).rstrip() + "\n"
+    target.write_text(body)
+    try:
+        target.chmod(0o600)
+    except OSError:
+        pass
+
+    summary = {k: ("***" if k in {"XRAY_CLIENT_SECRET", "JIRA_TOKEN"} else v) for k, v in updates.items()}
+    print(f"xray: wrote {len(updates)} key(s) to {target} (mode 0600)")
+    for k, v in summary.items():
+        print(f"  {k}={v}")
+
+
 def main() -> None:
     args = build_parser().parse_args()
 
     if args.cmd == "config":
+        action = getattr(args, "config_action", None) or "show"
+        if action == "set":
+            cmd_config_set(args)
+            return
         try:
             cfg = load_config()
         except SystemExit:
