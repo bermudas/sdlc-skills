@@ -139,9 +139,15 @@ the target manually.
 ### Test
 
 ```bash
-# Read
+# Read — by Jira key (Cloud will resolve key → numeric issueId via Jira REST first)
 xray test get PROJ-T42
 xray test get PROJ-T42 --raw          # structured body (ADF / REST JSON)
+
+# Read — when you already have the issueId (e.g. via Atlassian MCP):
+# skips the Jira-REST lookup entirely. Lets the CLI work with only XRAY_*
+# creds set; no JIRA_BASE_URL / JIRA_USER / JIRA_TOKEN required.
+xray test get --issue-id 10042
+xray test get PROJ-T42 --issue-id 10042   # both forms; --issue-id wins
 
 # Create (Manual)
 #   --steps file: JSON array of {action,data,result}

@@ -157,8 +157,10 @@ def load_config() -> Config:
     if deployment == "cloud":
         if not (client_id and client_secret):
             _die("cloud deployment requires XRAY_CLIENT_ID + XRAY_CLIENT_SECRET.")
-        if not jira_base_url:
-            _die("JIRA_BASE_URL is required on cloud.")
+        # JIRA_BASE_URL is NOT required at build time on Cloud — Xray-only commands
+        # (auth-verify, statuses, run *, import *, config) work with just XRAY_*.
+        # The check is deferred to _call_jira() / resolve_issue_id(), which fail with
+        # a precise message naming exactly what's missing for the command you ran.
         # Resolve Xray base URL: XRAY_BASE_URL (exact) > XRAY_REGION lookup > default global.
         raw_base = os.environ.get("XRAY_BASE_URL", "").strip()
         if raw_base:
@@ -322,10 +324,20 @@ def _call_xray(
 
 
 def _call_jira(cfg: Config, path: str, *, method: str = "GET", json_body: Any = None) -> Any:
-    if not cfg.jira_auth_header:
+    # Lazy validation — Jira creds are only required for commands that hit
+    # /rest/api/* (issueId / accountId / custom-field lookups). Build-time
+    # config is intentionally permissive; this is the gate.
+    missing: list[str] = []
+    if not cfg.jira_base_url:
+        missing.append("JIRA_BASE_URL")
+    if cfg.deployment == "cloud" and not cfg.jira_auth_header:
+        missing.append("JIRA_USER + JIRA_TOKEN")
+    if missing:
         _die(
-            "Jira REST call requires JIRA_USER (email) + JIRA_TOKEN on cloud. "
-            "Set both to enable issueId / accountId / field-id lookups."
+            "this command needs Jira REST: " + ", ".join(missing) + ". "
+            "Tip: pass --issue-id <numeric> on commands that support it to skip "
+            "the Jira lookup entirely. Otherwise set the missing vars (or run "
+            "`xray config set --jira-base-url … --jira-user … --jira-token …`)."
         )
     url = cfg.jira_base_url + path
     headers = {"Authorization": cfg.jira_auth_header, "Accept": "application/json"}
@@ -432,9 +444,22 @@ def _graphql(cfg: Config, query: str, variables: dict[str, Any] | None = None) -
 # Entity ops — dispatched on cfg.deployment
 # ────────────────────────────────────────────────────────────────────────
 
-def test_get(cfg: Config, key: str) -> dict:
+def test_get(cfg: Config, key: str | None = None, *, issue_id: str | None = None) -> dict:
+    """Fetch a Test by key OR by pre-resolved numeric issueId.
+
+    Pass `issue_id=` to skip Jira lookup entirely — useful when the id was
+    fetched via an Atlassian MCP, a previous CLI call, or any other path.
+    Cloud returns the key/summary in the GraphQL response, so omitting `key`
+    is fine when `issue_id` is given.
+
+    Server accepts the human key directly (no issueId translation), so on
+    Server `key` is required and `issue_id` is informational only.
+    """
     if cfg.deployment == "cloud":
-        issue_id = resolve_issue_id(cfg, key)
+        if not issue_id:
+            if not key:
+                _die("test get on cloud needs either a Jira key or --issue-id <numeric>.")
+            issue_id = resolve_issue_id(cfg, key)
         data = _graphql(cfg, """
             query($id: String!) {
               getTest(issueId: $id) {
@@ -448,7 +473,7 @@ def test_get(cfg: Config, key: str) -> dict:
               }
             }
         """, {"id": issue_id})
-        test = (data or {}).get("getTest") or _die(f"Test {key} not found.")
+        test = (data or {}).get("getTest") or _die(f"Test {key or issue_id} not found.")
         return test
     # server
     t = _call_xray(cfg, f"/api/test/{key}")
@@ -869,8 +894,10 @@ def build_parser() -> argparse.ArgumentParser:
 
     # test
     t = sub.add_parser("test", help="Test CRUD.").add_subparsers(dest="sub", required=True)
-    tg = t.add_parser("get"); tg.add_argument("key")
-    tg.add_argument("--raw", action="store_true")
+    tg = t.add_parser("get")
+    tg.add_argument("key", nargs="?", help="Jira key (e.g. PROJ-T42). Omit if --issue-id is given.")
+    tg.add_argument("--issue-id", dest="issue_id", help="Numeric issueId — skip Jira lookup. Use when you already have the id (e.g. from an Atlassian MCP).")
+    tg.add_argument("--raw", action="store_true", help="emit raw response (alias for --json)")
     tc = t.add_parser("create")
     tc.add_argument("--project", required=True)
     tc.add_argument("--summary", required=True)
@@ -978,11 +1005,31 @@ def cmd_config_set(args) -> None:
 
     new_keys = [(k, v) for k, v in updates.items() if k not in seen]
     if new_keys:
-        if out and out[-1].strip() != "":
-            out.append("")
-        out.append("# xray-testing — added by `xray config set`")
-        for k, v in new_keys:
-            out.append(f"{k}={v}")
+        # Reuse an existing "# xray-testing — added by ..." section if one is
+        # already in the file (we wrote it on a prior run). Insert new keys at
+        # the end of that section. Avoids stacking duplicate headers across
+        # re-runs of `config set`.
+        header = "# xray-testing — added by `xray config set`"
+        last_header_idx = -1
+        for i, line in enumerate(out):
+            if line.strip() == header:
+                last_header_idx = i
+        new_lines = [f"{k}={v}" for k, v in new_keys]
+        if last_header_idx >= 0:
+            # Insert at end of the existing section (header + its KEY=VAL lines).
+            end = last_header_idx + 1
+            while end < len(out):
+                stripped = out[end].lstrip()
+                if "=" in stripped and not stripped.startswith("#"):
+                    end += 1
+                else:
+                    break
+            out = out[:end] + new_lines + out[end:]
+        else:
+            if out and out[-1].strip() != "":
+                out.append("")
+            out.append(header)
+            out.extend(new_lines)
 
     body = "\n".join(out).rstrip() + "\n"
     target.write_text(body)
@@ -1036,7 +1083,7 @@ def main() -> None:
         return
 
     if args.cmd == "test" and args.sub == "get":
-        t = test_get(cfg, args.key)
+        t = test_get(cfg, args.key, issue_id=getattr(args, "issue_id", None))
         if args.raw or getattr(args, "json", False):
             _out(args, t)
         else:
