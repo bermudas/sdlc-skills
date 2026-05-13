@@ -10,10 +10,14 @@ metadata:
 ## Test Automation Workflow: Explore → Specify → Implement → Review
 
 **Core philosophy:** do not automate what you have not executed. Every case is
-run manually (via `browser-verify` or Playwright MCP) first — defects, missing
-data, and environmental gaps are surfaced *before* a line of automation code is
-written. Then a separate engineer implements the automation inside the
-project's existing framework. Then a reviewer re-runs it.
+run manually first — pick whichever browser tool is wired and fits the
+challenge (`playwright-testing` over MCP, `playwright-cli` from the shell,
+`browser-verify` over CDP; full triage in
+[`references/browser-tools.md`](references/browser-tools.md)) — so defects,
+missing data, and environmental gaps are surfaced *before* a line of
+automation code is written. Then a separate engineer implements the
+automation inside the project's existing framework. Then a reviewer
+re-runs it.
 
 **Why split the work into two agents:** context. The analysis pass
 carries exploration state (DOM snapshots, test data, console noise)
@@ -29,7 +33,10 @@ analyst execution, bug filing for defects discovered along the way,
 code review for the PR step, test-completion / TMS back-write for
 handoff, project context from scout. Which specific skills provide
 those capabilities is the calling agents' concern — this workflow
-describes the *flow*, not the toolchain.
+describes the *flow*, not the toolchain. When the calling agent has
+multiple browser-driving capabilities available, the triage in
+[`references/browser-tools.md`](references/browser-tools.md) covers
+how to pick between MCP / CLI / CDP shapes.
 
 ## Routing — how PM resolves slots to agents
 
