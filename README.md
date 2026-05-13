@@ -42,11 +42,13 @@ flowchart TB
         ext_matt[["mattpocock/skills<br/>skills/engineering/tdd"]]
         ext_obra[["obra/superpowers<br/>brainstorming, debugging,<br/>verification, ..."]]
         ext_tws[["twostraws/*-Agent-Skill<br/>SwiftUI, SwiftData,<br/>Swift Testing, Concurrency"]]
+        ext_msft[["microsoft/playwright-cli<br/>playwright-cli"]]
     end
 
     installer ==>|fetch at install time| ext_matt
     installer ==>|fetch at install time| ext_obra
     installer ==>|fetch at install time| ext_tws
+    installer ==>|fetch at install time| ext_msft
 
     sdlc ==>|direct install via<br/>plugin manifest or npx| ides
     sdlc ==>|install.sh delegates<br/>content to npx| octobots
@@ -349,6 +351,7 @@ catalog.
 | `swiftdata-pro` | [`twostraws/SwiftData-Agent-Skill`](https://github.com/twostraws/SwiftData-Agent-Skill) | `ios-dev` |
 | `swift-testing-pro` | [`twostraws/Swift-Testing-Agent-Skill`](https://github.com/twostraws/Swift-Testing-Agent-Skill) | `ios-dev` |
 | `swift-concurrency-pro` | [`twostraws/Swift-Concurrency-Agent-Skill`](https://github.com/twostraws/Swift-Concurrency-Agent-Skill) | `ios-dev` |
+| `playwright-cli` | [`microsoft/playwright-cli`](https://github.com/microsoft/playwright-cli) → `skills/playwright-cli/` | `qa-engineer`, `test-automation-engineer` |
 
 ## Using outside Octobots
 
@@ -454,6 +457,7 @@ re-distributes nothing, only catalogs and wires.
 - **[`mattpocock/skills`](https://github.com/mattpocock/skills)** — Matt Pocock. `skills/engineering/tdd/` (vertical-slice tracer bullets, integration-style tests, interface design for testability). MIT.
 - **[`obra/superpowers`](https://github.com/obra/superpowers)** — Jesse Vincent. `brainstorming`, `systematic-debugging`, `verification-before-completion`, `requesting-code-review`, `receiving-code-review`, `writing-skills`. MIT.
 - **Paul Hudson's Swift agent skills** — [`twostraws/SwiftUI-Agent-Skill`](https://github.com/twostraws/SwiftUI-Agent-Skill), [`twostraws/SwiftData-Agent-Skill`](https://github.com/twostraws/SwiftData-Agent-Skill), [`twostraws/Swift-Testing-Agent-Skill`](https://github.com/twostraws/Swift-Testing-Agent-Skill), [`twostraws/Swift-Concurrency-Agent-Skill`](https://github.com/twostraws/Swift-Concurrency-Agent-Skill). Powers the `ios-dev` agent. MIT.
+- **[`microsoft/playwright-cli`](https://github.com/microsoft/playwright-cli)** — Microsoft Playwright. `skills/playwright-cli/` (drive Playwright from the command line — browser launch, navigation, snapshot/locator interaction, tabs and storage, network mocking, tracing, test generation). Used by `qa-engineer` and `test-automation-engineer`. Apache-2.0.
 
 Thanks to all maintainers.
 
