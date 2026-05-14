@@ -282,19 +282,20 @@ frameworks, other IDEs) can point directly at `skills/<name>/`.
 
 ## Catalog
 
-### Agents (10)
+### Agents (11)
 
 | Agent | Persona | Role |
 |---|---|---|
 | `ba` | Alex | Business analyst — turns requirements into user stories with acceptance criteria |
-| `tech-lead` | Rio | Decomposes user stories into technical tasks with dependencies; owns framework-scale decisions for test automation |
-| `project-manager` | Max | Distributes tasks, tracks team state, escalates blockers, owns the merge gate |
+| `tech-lead` | Rio | Decomposes user stories into technical tasks with dependencies; system architect for application code (test-framework architecture is owned by `test-automation-lead`) |
+| `project-manager` | Max | Distributes feature-development tasks (BA → tech-lead → devs), tracks team state, owns the dev-merge gate. Forwards test-automation work to `test-automation-lead` |
+| `test-automation-lead` | Tal | **Owns the test-automation pipeline end-to-end** — routes analyst → implementer → reviewer slots, gates AFS quality, enforces no-defect-masking, owns test-framework architecture decisions (greenfield bootstrap, framework-scale work, mid-flow escalations), owns the automation-PR merge gate |
 | `python-dev` | Py | Python implementation — owns its own repo clone and branch |
 | `js-dev` | Jay | JavaScript / TypeScript implementation — owns its own repo clone and branch |
 | `ios-dev` | Io | iOS/Swift implementation — SwiftUI, SwiftData, Swift Testing (no simulator) |
 | `qa-engineer` | Sage | Tests PRs, reports findings, executes TMS cases and emits Automation-Friendly Specs via the `test-case-analysis` skill |
 | `test-automation-engineer` | Axel | Implements automation from AFS specs in the project's existing framework (Playwright / Cypress / pytest / JUnit / NUnit / WDIO) |
-| `scout` | Kit | Maps unfamiliar codebases — explores, documents patterns, flags risks |
+| `scout` | Kit | Maps unfamiliar codebases — explores, documents patterns, flags risks, wires up @-imports |
 | `personal-assistant` | Octo | Conversational assistant: vault, email, calendar, daily brief |
 
 ### Monorepo skills
@@ -307,7 +308,7 @@ frameworks, other IDEs) can point directly at `skills/<name>/`.
 | `implement-feature` | Feature implementation workflow used by devs |
 | `bugfix-workflow` | Structured bug investigation: reproduce → root cause → fix → regression test |
 | `test-case-analysis` | Execute a TMS case, capture stable selectors, flag defects, emit an Automation-Friendly Spec (AFS). Used by qa-engineer |
-| `test-automation-workflow` | End-to-end test automation — explore → specify (AFS) → implement → review. Pluggable TMS adapters (Zephyr / TestRail / Xray / Azure / markdown) over HTTP or MCP |
+| `test-automation-workflow` | IC-facing test automation process — implementer six-phase loop (Absorb → Explore → Automate → Execute → Debug → Handoff), AFS-driven workflow, no-defect-masking rules, run-report template. Pluggable TMS adapters (Zephyr / TestRail / Xray / Azure / markdown) over HTTP or MCP. **Orchestration owned by `test-automation-lead` agent** |
 | `project-seeder` | Scout's project onboarding / configuration flow |
 | `task-completion` | Five-step task completion protocol: verify → commit → PR → comment → notify |
 
@@ -371,15 +372,21 @@ shape of those assumptions is documented below.
 **`@import` paths auto-loaded at session start:**
 
 ```markdown
-@.agents/memory/<role>/snapshot.md
+@.agents/memory/<role>/MEMORY.md
+@.agents/profile.md
+@.agents/workflow.md
+@.agents/testing.md         # qa-engineer, TAE, test-automation-lead
+@.agents/architecture.md    # tech-lead
+@.agents/conventions.md     # devs
+@.agents/team-comms.md
 ```
 
-Under Octobots the supervisor regenerates `snapshot.md` at every role
-launch (inlining the curated entries + recent daily logs). Under stock
-IDEs the import resolves to a missing file on first session and the
-agent falls back to reading `.agents/memory/<role>/MEMORY.md` +
-individual entries on demand — same memory, slightly more work per
-session. Nothing breaks either way.
+`MEMORY.md` is the agent's memory index — it `@-imports` the curated
+entries (project briefing, user prefs, feedback) the agent needs at
+session start. The project-context files are scout's outputs; missing
+files resolve to non-fatal warnings (the agent runs with defaults).
+Scout's `project-seeder` Step 6.97 verifies the wiring after every
+seed — see [`skills/project-seeder/SKILL.md`](skills/project-seeder/SKILL.md).
 
 **Shell commands that assume the supervisor:**
 
