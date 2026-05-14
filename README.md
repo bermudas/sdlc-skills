@@ -309,7 +309,7 @@ frameworks, other IDEs) can point directly at `skills/<name>/`.
 | `project-seeder` | Scout's project onboarding / configuration flow |
 | `task-completion` | Five-step task completion protocol: verify → commit → PR → comment → notify |
 
-**Generic dev skills (14):**
+**Generic dev skills (15):**
 
 | Skill | What it does |
 |---|---|
@@ -321,6 +321,7 @@ frameworks, other IDEs) can point directly at `skills/<name>/`.
 | `xray-testing` | Xray CRUD + results import — Tests, Preconditions, Test Sets/Plans, Executions, Runs. Xray Cloud (GraphQL) + Server/DC (REST). Stdlib Python CLI fallback |
 | `atlassian-content` | Jira issue/comment authoring (ADF, API v3) + Confluence pages (storage format) with accountId mentions and post-creation verification |
 | `tosca-automation` | Tricentis TOSCA Cloud full lifecycle — TestCases, Modules (Html + SapEngine), Reusable Blocks, Playlists, Inventory/folders, TSU import/export. Bundled Typer CLI (`tosca_cli.py`) |
+| `servicenow-atf-automation` | ServiceNow Automated Test Framework full lifecycle — build / run / inspect ATF tests via REST. One-time Path B Scripted REST API bypasses the `glide_var` filter on `sys_atf_step.inputs`. Bundled bash + JS scripts for spec → test, suite + manual-runner execution, programmatic component capture/replay |
 | `goal-verifier` | Verify a task actually achieved its stated goal |
 | `context-gatherer` | Targeted codebase exploration before changes |
 | `deep-research` | Multi-source research and synthesis |

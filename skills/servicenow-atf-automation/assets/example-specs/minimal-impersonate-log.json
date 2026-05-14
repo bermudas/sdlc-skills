@@ -1,0 +1,18 @@
+{
+  "_comment": "Minimal sanity-probe spec. Two steps: impersonate, then log. Replace the user sys_id with a real one on your instance.",
+
+  "name": "ATF Path B sanity probe",
+  "description": "Minimal test — proves the Path B build pipeline works end-to-end. Safe to leave inactive (active=false).",
+  "active": false,
+  "failOnServerError": true,
+  "steps": [
+    {
+      "type": "impersonate",
+      "user": "REPLACE_WITH_SYS_USER_SYS_ID"
+    },
+    {
+      "type": "log",
+      "log": "Path B build pipeline reached the runner. Server-side GlideRecord works."
+    }
+  ]
+}

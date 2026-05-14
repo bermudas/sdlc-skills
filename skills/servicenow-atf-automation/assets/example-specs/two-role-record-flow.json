@@ -1,0 +1,43 @@
+{
+  "_comment": "Customer/Agent two-role record flow. Mirrors a typical Playwright e2e pattern: one user creates a record, another validates the state after processing. Adapt the user sys_ids, the target table, and the field values to your domain.",
+
+  "name": "Two-role record flow (example)",
+  "description": "Customer impersonates to create a record (via record_insert), Agent impersonates to validate state. Adapt to your table and roles.",
+  "active": false,
+  "failOnServerError": true,
+  "steps": [
+    {
+      "type": "impersonate",
+      "user": "REPLACE_WITH_CUSTOMER_SYS_ID"
+    },
+    {
+      "type": "log",
+      "log": "Phase 1 — Customer creates a record"
+    },
+    {
+      "type": "record_query",
+      "table": "sys_user",
+      "field_values": "user_nameSTARTSWITHcustomer",
+      "assert_type": "records_match_query"
+    },
+    {
+      "type": "record_insert",
+      "table": "REPLACE_WITH_TARGET_TABLE",
+      "field_values": "short_description=ATF Path B test^urgency=2"
+    },
+    {
+      "type": "impersonate",
+      "user": "REPLACE_WITH_AGENT_SYS_ID"
+    },
+    {
+      "type": "log",
+      "log": "Phase 2 — Agent processes the case (in real flow, you'd do UI steps here)"
+    },
+    {
+      "type": "record_query",
+      "table": "REPLACE_WITH_TARGET_TABLE",
+      "field_values": "short_description=ATF Path B test^state=1",
+      "assert_type": "records_match_query"
+    }
+  ]
+}

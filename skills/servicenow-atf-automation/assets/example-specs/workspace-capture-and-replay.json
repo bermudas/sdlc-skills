@@ -1,0 +1,49 @@
+{
+  "_README": "Workspace + captured-mugshot pattern. Two-phase. Phase 1: build a minimal test with just navigation steps. Run scripts/capture_components.sh <test> <nav_step> to populate sys_atf_ui_component with the page's mugshots. Phase 2: update the test (action:'update') with full Custom UI steps that reference the captured mugshots inline as the 'component' input. The capture flow is the programmatic equivalent of Test Designer's 'Record Page Components' UI button.",
+
+  "name": "Workspace form interaction — capture+replay example",
+  "description": "Skeleton you fill in two phases. Phase 1: build as-is and run capture_components.sh. Phase 2: replace the <PASTE_*_LOCATOR_JSON_HERE> placeholders with what find_components.sh prints.",
+  "active": true,
+  "failOnServerError": false,
+  "steps": [
+    {
+      "type": "impersonate",
+      "user": "<sys_user sys_id of the role you want — e.g., your Agent>"
+    },
+    {
+      "type": "open_workspace",
+      "workspace_page_url": "/now/cwf/agent/record/<table>/<record sys_id>"
+    },
+    {
+      "type": "assert_text_on_page",
+      "text": "<text that should appear after navigation>",
+      "assert_type": "text_on_page",
+      "_cols": { "timeout": "1970-01-01 00:00:20" }
+    },
+
+    {
+      "_comment": "AFTER Phase 1 capture, fill component with the locator JSON that scripts/find_components.sh prints for the button you want to click. Paste it as a string (the JSON-quoted content of the locator field).",
+      "type": "click_component",
+      "component": "<PASTE_BUTTON_LOCATOR_JSON_HERE>"
+    },
+
+    {
+      "_comment": "Set Component Values uses an encoded query format: <mugshot1>=<value1>^<mugshot2>=<value2>^ (trailing ^ required). Each mugshot is the full locator JSON of a setValue-capable component. Keep total length under ~5000 chars per step (glide_var size cap) — split into multiple steps if needed.",
+      "type": "set_component_values",
+      "component_values": "<PASTE_FIELD1_LOCATOR>=value1^<PASTE_FIELD2_LOCATOR>=value2^"
+    },
+
+    {
+      "type": "click_component",
+      "component": "<PASTE_SAVE_BUTTON_LOCATOR_JSON_HERE>"
+    },
+
+    {
+      "type": "record_query",
+      "table": "<table where the save should have inserted/updated>",
+      "field_values": "<encoded query — confirm the record exists>",
+      "assert_type": "records_match_query",
+      "enforce_security": "false"
+    }
+  ]
+}
