@@ -75,6 +75,7 @@ npx github:arozumenko/sdlc-skills init \
   --target copilot \
   --agents scout,test-automation-lead,qa-engineer,test-automation-engineer \
   --skills project-seeder,test-case-analysis,test-automation-workflow,playwright-testing,playwright-cli,browser-verify,bugfix-workflow,code-review,task-completion,issue-tracking,atlassian-content,xray-testing,memory,tdd,git-workflow,plan-feature, systematic-debugging, verification-before-completion, requesting-code-review, receiving-code-review, writing-skills \
+  --mode standalone
   --yes
 
 # Hybrid project (feature dev + test automation) — add PM, tech-lead, devs as needed
@@ -82,6 +83,7 @@ npx github:arozumenko/sdlc-skills init \
   --target copilot \
   --agents scout,project-manager,test-automation-lead,tech-lead,ba,qa-engineer,test-automation-engineer \
   --skills project-seeder,test-case-analysis,test-automation-workflow,playwright-testing,playwright-cli,browser-verify,bugfix-workflow,code-review,task-completion,issue-tracking,atlassian-content,xray-testing,memory,tdd,git-workflow,plan-feature , systematic-debugging, verification-before-completion, requesting-code-review, receiving-code-review, writing-skills \
+  --mode standalone
   --yes
 ```
 
