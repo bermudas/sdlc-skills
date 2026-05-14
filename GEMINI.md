@@ -34,6 +34,7 @@ are capability definitions, not always-on context.
 | `xray-testing` | CRUD + results import on Xray entities (Test / Precondition / Set / Plan / Execution / Run) across Cloud (GraphQL) and Server/DC (REST) |
 | `atlassian-content` | Authoring Jira issues/comments (ADF, API v3) and Confluence pages (storage format) with accountId mentions + post-creation verification |
 | `tosca-automation` | Tricentis TOSCA Cloud full lifecycle — TestCases, Modules, Reusable Blocks, Playlists, Inventory folders, TSU import/export |
+| `servicenow-atf-automation` | ServiceNow ATF full lifecycle via REST — build / run / inspect tests from JSON specs. Installs a one-time Path B Scripted REST API to bypass the `glide_var` filter on `sys_atf_step.inputs` |
 | `test-case-analysis` | Executing a TMS case end-to-end and emitting an Automation-Friendly Spec (AFS) |
 | `test-automation-workflow` | Automating a TMS test case end-to-end — explore, specify, implement, review |
 | `code-review` | Reviewing a PR or diff |
