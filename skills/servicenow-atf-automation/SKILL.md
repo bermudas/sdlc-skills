@@ -1,6 +1,6 @@
 ---
 name: servicenow-atf-automation
-description: Create, run, and inspect ServiceNow Automated Test Framework (ATF) tests programmatically — without the Test Designer UI, without browser automation, and without the Fluent SDK. Use whenever the user wants to build an ATF test as code, run an existing ATF test via REST / CLI, query what tests or step types exist on an instance, or asks why `sys_atf_step.inputs` reads back empty over the Table API. Covers the workaround for the platform's deliberate `glide_var` filter on the public REST surface (a server-side GlideRecord pattern, installed once as a Scripted REST API). Trigger for phrases like "ATF", "Automated Test Framework", "sys_atf_test", "create ServiceNow test", "run ATF from CI", "test the form / record / UI on ServiceNow", "build a test for my catalog item", or any ServiceNow test-automation work — even when the user doesn't say "ATF" explicitly.
+description: Create, run, and inspect ServiceNow Automated Test Framework (ATF) tests programmatically via two proven paths — the official `@servicenow/sdk` Fluent toolchain (`.now.ts` → `now-sdk build`/`install`, version-controlled code, OAuth incl. MFA) and a zero-install Scripted-REST builder ("Path B") that bypasses the platform's `glide_var` Table-API filter. Use whenever the user wants to build an ATF test as code, run an existing ATF test via REST/CLI/SDK, query what tests or step types exist on an instance, or asks why `sys_atf_step.inputs` reads back empty over the Table API. Trigger for phrases like "ATF", "Automated Test Framework", "sys_atf_test", "Fluent SDK", "now-sdk", "create ServiceNow test", "run ATF from CI", "test the form / record / UI on ServiceNow", "build a test for my catalog item", or any ServiceNow test-automation work — even when the user doesn't say "ATF" explicitly.
 license: Apache-2.0
 metadata:
   author: octobots
@@ -9,7 +9,14 @@ metadata:
 
 # ServiceNow ATF Automation
 
-This skill lets you create, run, and inspect ATF tests on any ServiceNow instance via pure REST — no browser, no SDK install, no MFA-protected SDK auth. It also documents how to discover what step types and existing tests live on an instance.
+This skill covers **two proven paths** for ATF tests on any ServiceNow instance:
+
+- **Fluent SDK** (`references/fluent-sdk.md`) — official `@servicenow/sdk`, `.now.ts` as version-controlled code, `now-sdk build`/`install`, OAuth (works with MFA, zero admin provisioning). Proven end-to-end on a live MFA tenant. Use when tests should live in source control.
+- **Path B** — a zero-install Scripted-REST builder that bypasses the `glide_var` Table-API filter via server-side GlideRecord. Use for Global-scope tests, Open-Workspace/Custom-UI steps, manual-runner dispatch, or AI-emitted JSON specs.
+
+They are complementary; both land in `sys_atf_test`. **Read `references/fluent-sdk.md` first if the task is "ATF tests as code".** It also documents how to discover step types and existing tests on an instance.
+
+> ⚠ **Universal batching rule** (cost a full debug cycle, applies to BOTH paths): a server-side step (`log`/`record*`/`impersonate`) placed *between* UI steps ends the UI batch and destroys `g_form` — the next UI assertion fails *"g_form is not defined"*. Keep UI steps **contiguous**; batch server steps strictly before/after the UI block. Details: `references/fluent-sdk.md` §6, `references/gotchas.md`.
 
 The skill assumes you have:
 - An instance URL, a username, and a password
@@ -31,7 +38,7 @@ What DOES work: **server-side GlideRecord** running inside the platform. Code li
 
 The cleanest, reusable way to expose that capability from outside is a **Custom Scripted REST API** that takes a JSON test spec and uses GlideRecord internally. This skill calls that **Path B**. One-time setup; every subsequent test is a single REST POST.
 
-If you instead want code-in-repo + TypeScript declarative DSL with `now-sdk build && now-sdk install`, see [references/fluent-sdk.md](references/fluent-sdk.md) — covered briefly there, not the focus here.
+If you instead want code-in-repo + TypeScript declarative DSL with `now-sdk build && now-sdk install`, see [references/fluent-sdk.md](references/fluent-sdk.md) — a **proven first-class path** (full end-to-end run on a live MFA tenant), not a footnote. The SDK serializes `glide_var` inputs natively, so SDK-authored tests don't need Path B's workaround at all.
 
 ## Transport priority — check in this order on every call
 
@@ -295,7 +302,7 @@ Read these on demand:
 | [references/spec-schema.md](references/spec-schema.md) | The full JSON spec language (every supported field, every constraint). |
 | [references/gotchas.md](references/gotchas.md) | The known traps — `assert_type` values, encoded query syntax, MFA paths, namespace prefixes, choice fields vs labels. |
 | [references/api-cheatsheet.md](references/api-cheatsheet.md) | Every endpoint with curl examples — build, run, poll, results, discovery, cleanup. |
-| [references/fluent-sdk.md](references/fluent-sdk.md) | The alternative path for teams that want ATF tests committed as TypeScript code (`@servicenow/sdk` + `.now.ts`). |
+| [references/fluent-sdk.md](references/fluent-sdk.md) | **Proven first-class path** — `@servicenow/sdk` Fluent (`.now.ts`). Setup, OAuth-with-MFA (zero admin), the `fluentDir` trap, literals-only AST, additive-install orphan remedy, the batching rule, classic-vs-workspace field-state, whitelist + calibration loop. Read this for "ATF tests as code". |
 
 ## Script index
 

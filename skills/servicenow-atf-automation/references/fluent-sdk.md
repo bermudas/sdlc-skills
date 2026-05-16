@@ -1,178 +1,284 @@
-# Fluent SDK — The Alternative Path
+# Fluent SDK — ATF tests as version-controlled code (PROVEN END-TO-END)
 
-ServiceNow's official `@servicenow/sdk` (Fluent) compiles `.now.ts` test definitions into update set XML that ServiceNow ingests via its internal serializer. The internal serializer sets `var__m_*` columns server-side, so Fluent works for the same underlying reason as Path B — it ends up running inside the platform.
+ServiceNow's official `@servicenow/sdk` ("Fluent") compiles `.now.ts` test
+definitions into application metadata (`sys_atf_test` + `sys_atf_step` +
+`sys_variable_value`) and installs it on the instance. The SDK serializes the
+`glide_var` step inputs **natively** — so for SDK-authored tests you do **not**
+need Path B's Scripted-REST `glide_var` workaround at all.
 
-This file documents Fluent enough to choose between paths and to spin up a working setup. If you commit to Fluent, the [official docs](https://www.servicenow.com/docs/r/yokohama/application-development/servicenow-sdk/) cover the rest.
+> Provenance: `@servicenow/sdk` is published under the official `@servicenow`
+> npm scope, maintained by `buildeng@servicenow.com`. `now-sdk` is its CLI.
+> This guide reflects a full end-to-end run proven on a live MFA-enforced
+> tenant (author → build → OAuth login → deploy → run → green). Every claim
+> below was verified, not assumed. Several older write-ups (including earlier
+> versions of this file) were wrong about OAuth and MFA — corrected here.
 
-## When to choose Fluent over Path B
+Further reading (port patterns from these; trust THIS file over them where
+they conflict, it reflects a real run):
+- Upstream skill: `github.com/aatrey882/servicenow-agent-skills` → `sn-sdk-fluent/SKILL.md`
+- Official examples: `github.com/ServiceNow/sdk-examples/tree/main/test-atf-sample`
+- `now-sdk explain atf-guide` / `test-api` / `now-config-reference`
 
-Pick Fluent if:
+---
 
-- Your team wants ATF tests committed as TypeScript files in version control, reviewable like any other code
-- You already use the ServiceNow SDK for app development (shared toolchain)
-- Type safety on test definitions matters more than zero-install footprint
-- You can deal with the auth setup (interactive on first install; OAuth after)
+## 1. SDK path vs Path B — choose deliberately
 
-Pick Path B if:
+Pick **Fluent SDK** when: tests must live in version control as code,
+reviewed like any other change; you want the *official, vendor-supported*
+serializer (no home-grown `glide_var` hack); typed output-variable chaining
+(`const r = atf.form.submitForm(...)` → `r.record_id`).
 
-- You want zero client-side install (just `curl`)
-- You're driving from an AI agent that emits JSON specs
-- The team doesn't standardize on ServiceNow SDK for other work
-- MFA on basic-auth is a blocker for your CI and OAuth setup isn't worth it
+Pick **Path B** (Scripted-REST builder) when: you need **Global-scope** ATF
+tests (SDK only installs *scoped apps* — see §5); you need an
+**Open Workspace Page** / Custom-UI step (the Fluent API has none — see §4);
+zero client install; AI agent emitting JSON specs; or the
+`action:"run"` manual-runner dispatch.
 
-Both paths produce identical `sys_atf_test` records on the instance. Choosing one doesn't lock you out of the other.
+Complementary, both land in `sys_atf_test`. Common split: **author with the
+SDK** (source of truth), **dispatch runs / Global deploys with Path B**.
 
-## Installation
+---
 
-```bash
-npm install -g @servicenow/sdk          # provides the `now-sdk` binary
-# or, per-project:
-mkdir my-atf-tests && cd my-atf-tests
-npm init -y && npm install @servicenow/sdk
-# now-sdk is at ./node_modules/.bin/now-sdk
-```
+## 2. Project setup
 
-Requires Node 20+. The `now-sdk` binary is also aliased as `sdk` and `@servicenow/sdk`.
-
-## Authentication
-
-```bash
-now-sdk auth --add https://your-instance.service-now.com --type basic --alias mysn
-```
-
-The command prompts interactively for username and password. **It does not accept piped stdin** — the prompt library re-renders on every keystroke and breaks `expect` automation. You have to type credentials manually (or use OAuth, below).
-
-Credentials are stored in your OS keychain (macOS Keychain, Linux libsecret, Windows Credential Manager).
-
-### MFA gotcha
-
-If your account requires MFA, the basic-auth login flow will fail with `Your account requires Multi-factor authentication. Please enter the 6-digit code...`. The SDK does accept the code if you type it interactively, but you'll be entering it on every `now-sdk install`. For CI this is unworkable. Two fixes:
-
-1. **OAuth** (recommended for CI). Register an OAuth app on the instance:
-   - `System OAuth → Application Registry → New`
-   - `Create an OAuth API endpoint for external clients`
-   - Save the client ID and secret
-   - `now-sdk auth --add <instance> --type oauth --alias mysn` — provides the client ID/secret, follows OAuth code grant. Token bypasses MFA.
-
-2. **MFA-exempt service account.** Some instances allow excluding specific users from MFA via a group. If your admin can put a dedicated CI user in that group, basic auth works without prompts.
-
-## Project init
+Node 20+ (tested on v25). Per-project:
 
 ```bash
-now-sdk init \
-  --auth mysn \
-  --appName "My ATF Tests" \
-  --packageName "@mycompany/atf-tests" \
-  --scopeName "x_mc_atf" \
-  --template typescript.basic
+mkdir my-atf && cd my-atf
+npx @servicenow/sdk@latest init \
+  --appName "My ATF Tests" --packageName "my-atf-tests" \
+  --scopeName "x_<companycode>_atf" --template base --auth <alias>
+npm install
 ```
 
-This creates `now.config.json`, `tsconfig.json`, and a project skeleton. `--scopeName` must start with a vendor prefix on most instances (typically `x_`) and is limited to 18 characters.
+- `now-sdk init` **reserves the scope on the instance** (creates `sys_app` /
+  `sys_scope`) — needs a working `--auth` alias; it is a shared-state change.
+  Scope = `x_<companycode>_<app>`, **≤ 18 chars**; company code is the
+  instance property `glide.appcreator.company.code`
+  (`GET /api/now/table/sys_properties?sysparm_query=name=glide.appcreator.company.code`).
+- `--template base` = minimal scaffold (no client UI) — right for ATF.
+- The scaffold pins `@servicenow/glide` to **its own correct version**.
+  **Never hand-pin `@servicenow/glide`** — guessing a version 404s on npm.
 
-## Writing a test
+### ⚠ now.config.json — the `fluentDir` trap
 
-Create `src/atf/my-test.now.ts`:
+Default `fluentDir` is **`src/fluent`**, NOT `src`. If `.now.ts` files live
+in `src/` (as the official examples do) and you don't set `fluentDir`,
+`now-sdk build` **silently emits zero ATF records** (only `sys_module`). Set
+it:
+
+```json
+{ "scope": "x_<companycode>_atf", "scopeId": "<32-hex from init>",
+  "name": "My ATF Tests", "fluentDir": "src" }
+```
+
+---
+
+## 3. Auth — OAuth is the MFA answer, and needs ZERO admin setup
+
+```bash
+now-sdk auth --add https://INSTANCE.service-now.com --type <basic|oauth> --alias <alias>
+now-sdk auth --list
+```
+
+**`--type basic` has NO MFA support.** On an MFA account, basic auth
+(interactive *and* CI env-var mode `SN_SDK_NODE_ENV=SN_SDK_CI_INSTALL` +
+`SN_SDK_INSTANCE_URL/USER/USER_PWD`) **detects MFA, logs it, and hard-exits —
+it never prompts for the code.** Not a TTY issue; `expect`/`tmux` cannot help
+(no prompt exists). Older "type the code interactively" docs are wrong. Use
+basic only for non-MFA accounts/PDIs.
+
+**`--type oauth` works with MFA and needs NO instance provisioning.** It uses
+a **built-in SDK OAuth client already present on every instance** (you'll see
+`client_id=543e5655…` in the URL). There is **no** "register an OAuth API
+endpoint" step — that older instruction is wrong. Flow (human, needs a
+browser): it opens `…/oauth_auth.do?…redirect_uri=%2Fsdk-oauth.do…`; user
+does the **normal web login incl. MFA**; ServiceNow redirects to
+`…/sdk-oauth.do` showing an **authorization code**; user pastes it into the
+masked CLI prompt; token is stored and **auto-refreshes** (`install` prints
+`Access Token has expired, refreshing token` and proceeds — one-time browser
+login → unattended redeploys).
+
+Deploy with the stored alias and **without** the CI env vars (they force the
+MFA-incompatible CI path):
+
+```bash
+env -u SN_SDK_NODE_ENV -u SN_SDK_INSTANCE_URL -u SN_SDK_USER -u SN_SDK_USER_PWD \
+  npx @servicenow/sdk install --auth <alias>
+```
+
+Fully-unattended CI on an MFA tenant still wants an **MFA-exempt service
+account** (then `--type basic` CI mode works).
+
+---
+
+## 4. Writing a test — Fluent is a STATIC AST parser
 
 ```typescript
-import { Test } from "@servicenow/sdk/core";
-import "@servicenow/sdk/global";
+import { Test } from '@servicenow/sdk/core'
 
-Test(
-  {
-    $id: Now.ID["my_test_id"],         // unique within your app
-    name: "My ATF Test",
-    description: "...",
-    active: true,
-    failOnServerError: true,
-  },
-  (atf) => {
-    atf.server.impersonate({
-      $id: Now.ID["step_imp_customer"],
-      user: "<sys_user sys_id>",
-    });
-
-    atf.server.log({
-      $id: Now.ID["step_log_1"],
-      log: "Customer phase begin",
-    });
-
-    atf.server.recordValidation({
-      $id: Now.ID["step_validate_1"],
-      table: "incident",
-      record_id: "<sys_id>",
-      conditions: "state=3",
-    });
-  },
-);
+export default Test(
+    { $id: Now.ID['my-test'], name: 'My ATF Test',
+      description: 'single string literal only', active: true, failOnServerError: false },
+    (atf) => {
+        atf.server.impersonate({ $id: 'imp', user: '<sys_user sys_id>' })
+        atf.form.openNewForm({ $id: 'open', table: 'incident', view: '', formUI: 'standard_ui' })
+        atf.form.setFieldValue({ $id: 'set', table: 'incident', formUI: 'standard_ui', fieldValues: { short_description: 'x' } })
+        const rec = atf.form.submitForm({ $id: 'submit', formUI: 'standard_ui', assert: 'form_submitted_to_server' })
+        atf.server.recordValidation({ $id: 'val', table: 'incident', recordId: rec.record_id, fieldValues: 'short_description=x^EQ', enforceSecurity: true, assert: 'record_validated' })
+    }
+)
 ```
 
-Key concepts:
+**Hard constraint — property values must be string LITERALS.** The build
+statically analyses the AST; it does **not** execute the file. Concatenation
+(`'a' + 'b'`), template literals, computed values, or any expression in a
+property value fail with `TS303: Failed to parse property`. Encoded queries,
+descriptions, logs — all single inline literals. Plan data accordingly.
 
-- **`Test()`** declares a `sys_atf_test`. The first arg is metadata, the second is a callback that builds steps.
-- **`Now.ID["name"]`** mints stable sys_ids. The name is your local key; the SDK persists the mapping in a `keys.ts` file so the same logical step always gets the same sys_id across rebuilds.
-- **`atf.<category>.<method>`** is the step-builder API. Categories include `server`, `form`, `form_SP`, `rest`, `catalog`, `catalog_SP`, `email`, `applicationNavigator`, `reporting`, `responsiveDashboard`.
-- **All step methods take a `$id` plus the step-specific inputs** (matching the input element names from `atf_input_variable`).
+`Now.ID['key']` mints a **deterministic** sys_id from the key — stable across
+rebuilds; so the test sys_id is stable and `sys_atf_whitelist`/history keyed
+to it survive re-deploys.
 
-For the full method surface, run:
+### API surface
+
+`atf.<group>.<method>({ $id, ...inputs })`. Groups: `server`, `form`, `rest`,
+`catalog`, `applicationNavigator`, `email`, `reporting`,
+`responsiveDashboard`.
+- `server`: `impersonate`, `log`, `recordInsert`, `recordValidation`,
+  `recordQuery`, `recordUpdate`, `recordDelete`, `runServerSideScript`, `createUser`.
+- `form`: `openNewForm`, `openExistingRecord`, `setFieldValue`, `submitForm`,
+  `fieldStateValidation`, `fieldValueValidation`, `clickUIAction`,
+  `clickDeclarativeAction`, `uiActionVisibility`, `declarativeActionVisibility`,
+  `clickModalButton`.
+- `formUI`: `standard_ui | service_operations_workspace | asset_workspace | cmdb_workspace`.
+- Output chaining: `const r = atf.form.submitForm(...)` → `r.record_id`
+  (also `atf.server.recordInsert`).
+- Input shapes: `recordValidation`/`recordQuery` `fieldValues` =
+  **encoded-query string**; `setFieldValue`/`recordInsert` `fieldValues` =
+  **object**; `recordValidation` also takes `recordId`. Authoritative
+  signatures: `node_modules/@servicenow/sdk-core/dist/app/Test.d.ts`.
+
+**No `openWorkspace` / Custom-UI / "Open Workspace Page" step exists in
+Fluent.** A workspace-navigation QTest cannot be click-driven via the SDK —
+use `openNewForm` (opens the form directly) + server-side outcome
+verification, or Path B's `open_workspace`.
+
+---
+
+## 5. Build & deploy — scoped only, install is ADDITIVE
 
 ```bash
-now-sdk explain atf-guide   # the strategic guide
-now-sdk explain test-api    # the API reference
+npx @servicenow/sdk build                       # 100% local, no instance contact
+npx @servicenow/sdk install --auth <alias>
 ```
 
-## Build and deploy
+- `build` emits `dist/app/update/sys_atf_test_*.xml` + `sys_atf_step_*.xml` +
+  `sys_variable_value` (glide_var inputs serialized correctly by the official
+  toolchain). Sanity-check: `ls dist/app/update | grep -c sys_atf_step` — 0 ⇒
+  the `fluentDir` trap (§2).
+- **SDK installs SCOPED apps only.** `scope:"global"` install fails ("Could
+  not determine app installation status", writes nothing). Tests land in the
+  scoped app; the platform shows a cosmetic *"record is in <App>, but Global
+  is the current application"* banner — scoped ATF executes fine vs Global
+  tables (proven). To truly remove the banner, deploy to Global via Path B.
+
+### ⚠ `install` is ADDITIVE for `sys_atf_step` — orphans WILL break the test
+
+Re-`install` after changing a test's step `$id` set does **not** prune old
+steps. They stay with duplicate `order` and **still execute** (a stale broken
+step keeps failing your "fixed" test; instance step count >> build count).
+Remedy after any step-structure change — **wipe all steps for the test
+sys_id, then reinstall** (install recreates exactly the current build):
 
 ```bash
-now-sdk build       # compiles all .now.ts files into an installable package
-now-sdk install     # uploads to the instance configured by your auth alias
+TID=<test sys_id>      # stable from Now.ID['key']
+for s in $(curl -sS -u "$U:$P" "$HOST/api/now/table/sys_atf_step?sysparm_query=test=$TID&sysparm_fields=sys_id&sysparm_limit=500" \
+  | python3 -c "import json,sys;print(' '.join(r['sys_id'] for r in json.load(sys.stdin)['result']))"); do
+  curl -sS -o /dev/null -X DELETE -u "$U:$P" "$HOST/api/now/table/sys_atf_step/$s"; done
+npx @servicenow/sdk install --auth <alias>
+# verify instance step count == ls dist/app/update | grep -c sys_atf_step
 ```
 
-If you re-run `install`, the SDK does a delta update — unchanged records are skipped, changes are applied via update set.
+(`scripts/sdk_wipe_steps.sh <test_sys_id>` ships this.)
 
-To re-create from scratch (e.g., if local and instance state diverge): `now-sdk install --reinstall` — *uninstalls* the app on the instance first, then reinstalls. **Records created on-instance that aren't in your local source will be lost.** Use carefully.
+---
 
-## Running tests created via Fluent
+## 6. THE BATCHING RULE — server steps must not split a UI batch
 
-Same as Path B — the `sys_atf_test` records that Fluent produces are normal ATF tests. Wrap in a suite, trigger via `/api/sn_cicd/testsuite/run`, poll, read results. The Path B `run_suite.sh` works equally well for Fluent-built tests:
+The most expensive lesson of the proving run. ATF runs UI steps in a browser
+batch sharing one `g_form`. A **server-side step (`server.log`,
+`server.record*`, `impersonate`) placed *between* UI steps ends the UI batch
+and destroys the form context.** The next UI assertion fails:
+
+> `FAILURE: Unable to perform field state validation because g_form is not defined. A valid form must be open before running assertions`
+
+Documented in the SDK's own `test-atf-sample/atf-batching.now.ts`. It bit us:
+traceability `server.log` steps between every UI action silently broke every
+downstream UI assertion.
+
+**Rule:** keep the whole UI flow **contiguous**
+(`openNewForm → setFieldValue → fieldStateValidation → … → submitForm`, zero
+`server.*` between). Batch all `impersonate`/`recordValidation`/`log` strictly
+**before and after** the UI block. Traceability goes in test/step
+descriptions or one `server.log` *before* the UI batch — never interleaved.
+Applies to Path B specs that mix server + form steps too.
+
+---
+
+## 7. UI step reality — what works, whitelist, calibration
+
+- **`fieldStateValidation`/`fieldValueValidation` execute on classic
+  (`standard_ui`)** even on heavily client-scripted tables (read assertions —
+  robust). On **workspace** `formUI` they hit `ATF_INTENT_GENERATOR` timeout
+  (architectural) — don't use workspace formUI for field-state asserts.
+- **`setFieldValue` can throw** on forms with reactive async-`GlideAjax`
+  `onChange`: `Cannot read properties of undefined (reading 'message')` — ATF
+  choking on a benign incidental client error, not the thing under test.
+- **`sys_atf_whitelist`** downgrades a known-benign client error to `warning`
+  per-test so the step proceeds. Legitimate **iff** the error is incidental
+  *and* real assertions still prove the outcome (a true defect still fails
+  them) — that is NOT defect-masking. Whitelisting the thing under test IS.
+  Keep the outcome assertions.
+  `./scripts/whitelist_error.sh <test_sys_id> "<error substring>" warning`
+- **Calibrate against reality (probe loop).** Don't assume
+  mandatory/readonly/visible. Run `fieldStateValidation`; the failure tells
+  the true state (`Expected field 'x' to be visible but it was not visible`);
+  correct; repeat. Field states are usually **driven by other fields** (a
+  classification dropdown flips half the form) — assert state **after** the
+  trigger, in order. Asserting state *before* the change that causes it is
+  the #1 authoring bug (cost us a full run).
+
+---
+
+## 8. Running an SDK-authored test
+
+Normal `sys_atf_test`. `/api/sn_cicd/testsuite/run` needs a *scheduled*
+runner; for a logged-in manual `/atf_test_runner.do` browser dispatch via
+Path B `action:"run"` (`scripts/run_test.sh <test_sys_id> [runner_session_id]`).
+Pin `runner_session_id` if the manual runner flaps Online/Offline
+(auto-discovery silently no-ops when none online at dispatch). Cancel stale
+`running`/`pending`/`waiting` `sys_atf_test_result` rows (status `canceled`,
+single-L) — they block dispatch.
+
+---
+
+## 9. Example patterns
+
+`assets/fluent-examples/` ships: a server+REST pattern (official-sample
+shape) and the **real-steps UI form pattern** (the proven shape) which
+encodes §6 (contiguous UI batch, server validations at the ends) and §7
+(classic `formUI`, whitelist + calibrated `fieldStateValidation`). Start from
+those — the official samples are all server-side / simple `standard_ui` and
+don't show the batching discipline a real reactive form needs.
+
+---
+
+## 10. Commands
 
 ```bash
-# Source the Path B env loader so $SN_ATF_INSTANCE and $ATF_AUTH are populated
-source ./scripts/_env.sh && require_creds
-
-# Find your Fluent-built test by name
-TEST_SYSID=$(curl -sS -u "$ATF_AUTH" -H "Accept: application/json" \
-  "$SN_ATF_INSTANCE/api/now/table/sys_atf_test?sysparm_query=name=My%20ATF%20Test&sysparm_fields=sys_id&sysparm_limit=1" \
-  | python3 -c "import json,sys; print(json.load(sys.stdin)['result'][0]['sys_id'])")
-
-# Run it via the Path B run-suite script
-./scripts/run_suite.sh "$TEST_SYSID"
-```
-
-## When to combine Fluent + Path B
-
-A reasonable pattern for teams that adopt both:
-
-- **Fluent for stable, long-lived tests** that should live in source control and be reviewed
-- **Path B for ephemeral / generated / AI-driven test construction** — exploratory tests, tests built from external data, throwaway smoke checks
-
-The tests don't conflict — they all land in `sys_atf_test`. Just adopt naming prefixes so it's clear which framework produced which test.
-
-## What Fluent can do that Path B can't (yet)
-
-- **Type-checked references** — passing a string where a `Record<'sys_user'>` is expected fails at compile time
-- **Cross-step output capture** — `const newCase = atf.server.recordInsert({...})` returns a typed handle you can pass to later steps; the SDK generates the `{{Step N: ...}}` expression for you
-- **Versioned updates** — the SDK tracks what was previously deployed and only sends deltas
-
-Path B can be extended to handle these (see `spec-schema.md` § Extending the builder) but it's a "build it yourself" situation, while Fluent gives them out of the box.
-
-## Useful Fluent commands
-
-```bash
-now-sdk explain --list                # list all available documentation topics
-now-sdk explain atf-guide             # high-level strategy
-now-sdk explain test-api              # the Test() function and ATF categories
-now-sdk explain fluent-overview       # general Fluent intro
-now-sdk download <directory>          # download an existing app from the instance
-now-sdk transform                     # convert legacy update-set XML to Fluent TS
-now-sdk dependencies                  # download type definitions for tables you reference
+now-sdk explain --list | atf-guide | test-api | now-config-reference
+now-sdk auth --list
+now-sdk download <dir>     # pull existing app
+now-sdk transform          # legacy update-set XML -> Fluent
 ```

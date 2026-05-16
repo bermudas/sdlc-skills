@@ -448,3 +448,70 @@ After many iterations on a workspace sub-record form (any child record reachable
 This pattern has been validated end-to-end against several real workspace sub-record flows: typically 6–8 steps, with one warning expected when the page emits a benign platform-side data-broker error that's whitelisted per § "Whitelisting known platform errors" below.
 
 **This pattern generalises**: any workspace sub-record form can be filled this way without needing to capture Custom UI mugshots for buttons / tabs / options.
+
+---
+
+## Fluent SDK gotchas (proven on a live MFA tenant — see references/fluent-sdk.md)
+
+### THE BATCHING RULE (universal — Path B too): server steps must not split a UI batch
+ATF runs UI steps in one browser batch sharing `g_form`. A server-side step
+(`server.log` / `server.record*` / `impersonate`) placed **between** UI steps
+ends the UI batch; the next UI assertion fails:
+`Unable to perform field state validation because g_form is not defined`.
+Keep the whole UI flow contiguous (`openNewForm → setFieldValue →
+fieldStateValidation → … → submitForm`, zero server steps between); batch
+server/log/validation steps strictly before and after the UI block. (The
+SDK's own `test-atf-sample/atf-batching.now.ts` documents this.) Symptom we
+hit: traceability `server.log` between every UI action silently broke every
+downstream UI assertion.
+
+### `now-sdk install` is ADDITIVE for `sys_atf_step`
+Re-installing after changing a test's step `$id` set does NOT prune old
+steps — orphans remain with duplicate `order` and still execute (a stale
+broken step keeps failing your "fixed" test; instance step count >> build
+count, interleaved old/new). Remedy: wipe ALL `sys_atf_step` for the test
+sys_id, then `now-sdk install` (recreates exactly the current build).
+`scripts/sdk_wipe_steps.sh <test_sys_id>` ships this. Test sys_id is stable
+(deterministic from `Now.ID['key']`) so whitelist/history survive.
+
+### now.config.json default `fluentDir` is `src/fluent`, NOT `src`
+`.now.ts` in `src/` without `"fluentDir": "src"` ⇒ `now-sdk build` silently
+emits zero ATF (only `sys_module`). Always verify
+`ls dist/app/update | grep -c sys_atf_step` > 0 after build.
+
+### Fluent build is a STATIC AST parser — string literals only
+No concatenation / template literals / computed values / expressions in any
+property value (`TS303: Failed to parse property`). Encoded queries,
+descriptions, logs must be single inline literals.
+
+### SDK auth: basic has NO MFA; OAuth has MFA + needs ZERO admin setup
+`--type basic` (interactive AND CI env-var mode) hard-exits on an MFA account
+without ever prompting for the code — not fixable by `expect`/`tmux`.
+`--type oauth` uses a built-in SDK OAuth client already on every instance
+(`client_id=543e5655…`, NO Application-Registry step): browser login handles
+MFA, paste the `/sdk-oauth.do` code, token auto-refreshes (one-time login →
+unattended redeploys). Deploy with `--auth <alias>` and `env -u
+SN_SDK_NODE_ENV -u SN_SDK_INSTANCE_URL -u SN_SDK_USER -u SN_SDK_USER_PWD`
+(the CI env vars force the MFA-incompatible path).
+
+### SDK installs SCOPED apps only
+`scope:"global"` install fails ("Could not determine app installation
+status", writes nothing). Scoped ATF tests vs Global tables show a cosmetic
+*"record is in <App>, but Global is the current application"* banner —
+execution is unaffected (proven). Global deploy requires Path B.
+
+### Don't hand-pin `@servicenow/glide`
+The `now-sdk init` scaffold pins it to its own correct version. Guessing a
+version (e.g. matching the sdk version) 404s on npm.
+
+### Field-state assertions: classic works, workspace times out; calibrate
+`fieldStateValidation`/`fieldValueValidation` execute on `standard_ui` even on
+heavily client-scripted forms (read asserts — robust). On workspace `formUI`
+they hit `ATF_INTENT_GENERATOR` timeout (architectural). `setFieldValue` can
+throw on reactive async-`GlideAjax onChange` forms (`Cannot read properties of
+undefined (reading 'message')`) — whitelist that benign incidental error
+(warning) IFF outcome assertions still prove correctness (not defect-masking).
+Never assume field states: run the assertion, the failure tells the true
+state, correct, repeat. States are usually driven by OTHER fields — assert
+AFTER the trigger, in order. Asserting state *before* the change that causes
+it is the #1 authoring bug.
