@@ -290,6 +290,129 @@ The build-and-run loop being easy doesn't mean test design is easy. The same thi
 - **Set up via `record_insert`** rather than via the UI when the UI step isn't what's being tested — faster, less brittle.
 - **Avoid stateful chains** where Step N depends on output from Step M-3 unless that's exactly what you're testing — fragility compounds.
 
+## Best practices
+
+### Test design
+
+- **Single responsibility.** Each test validates one specific scenario. Two scenarios = two tests.
+- **Independence.** Tests must not depend on other tests' execution order or persisted state. Each test runs in isolation.
+- **Isolation.** Seed unique data (`gs.generateGUID()` slices or run-markers) per test. Never share mutable fixtures.
+- **Cleanup.** Always tear down what you create, even on test failure — see [`test-data-factory.md`](references/test-data-factory.md) § "Idempotency / orphan-data cleanup" for the two backstop patterns.
+- **Naming.** Use descriptive names: `[Feature]_[Scenario]_[ExpectedResult]`. *"Incident_P1_AutoAssignsToCriticalTeam"* beats *"Test 17 (Mike)"*.
+
+### Test data
+
+- **Unique markers.** GUID or timestamp in every test-data identifier so concurrent runs and parallel suites don't collide.
+- **No production data.** Never reference real user data, real customer records, or real case IDs in tests.
+- **Minimal scope.** Create only what the test asserts on; if you don't validate it, you don't need to seed it.
+- **Factory pattern.** When the same fixture shape appears across many tests, extract it — see [`test-data-factory.md`](references/test-data-factory.md).
+
+### Assertions
+
+- **Specific values.** Assert on actual values (`state=3`, `priority=1`), not "not empty" or "exists".
+- **Multiple aspects.** A real test validates all critical observable outcomes — record state + assignment + audit log + notification + etc. — not just one.
+- **Meaningful messages.** When an assertion fails, the output message should tell the next person exactly what was expected vs observed without them having to re-run the test.
+- **Negative testing.** Verify that invalid operations are rejected as well as valid ones succeed. Especially for ACL/security flows.
+
+### Performance
+
+- **Limit queries.** `.setLimit(N)` on every GlideRecord query that isn't validating "exactly one".
+- **Batch operations.** Group similar inserts/updates inside one `run_server_script` step rather than one step per record.
+- **Server > UI when you can.** A server-side `record_validation` is faster and more reliable than the equivalent UI assertion. Use UI steps only when UI behaviour is itself under test.
+- **Parallel suites.** Independent test suites can run in parallel — see [`ci-cd-integration.md`](references/ci-cd-integration.md) § "Parallel suites".
+
+### Maintenance
+
+- **Version control.** Author tests as code:
+  - **Fluent SDK** (`.now.ts` files) for code-as-source-of-truth — see [`fluent-sdk.md`](references/fluent-sdk.md).
+  - **Path B JSON specs** as a fallback for cases where the SDK doesn't cover the step type.
+  - Either way, the **on-disk artifact is canonical** — re-deploys recreate the in-platform records deterministically.
+- **Descriptive metadata.** Set `description` on tests and `description`/`step_name` on each step. Three months from now, you'll be the next person.
+- **Refactor with the code.** When the system under test changes, change the test in the same PR — drift between test and product is the worst kind of red.
+- **Run often.** A test that only runs at release is a test that will be broken at release.
+
+## Troubleshooting playbook
+
+For the **platform-level traps** (`glide_var` filter, `^EQ` terminator, namespace prefixes, MFA paths, choice fields vs labels) see [`gotchas.md`](references/gotchas.md). The patterns below cover **operational symptoms** you hit during run/maintain.
+
+### Test fails to start — status stays "Pending"
+
+**Likely causes:**
+- No online Test Runner agent.
+- Suite-level filter excludes everything.
+- The dispatch was via `/api/sn_cicd/testsuite/run` and there's no **scheduled** runner — only manual ones (the runner-type ceiling).
+
+**Diagnose:**
+```bash
+# Are any agents online?
+curl -u "$SN_ATF_USER:$SN_ATF_PASSWORD" \
+  "$SN_ATF_INSTANCE/api/now/table/sys_atf_agent?sysparm_query=status=Online&sysparm_fields=name,type,status,last_checkin"
+```
+Look for at least one row with `status=Online`. If all `type=manual`, the CI/CD endpoint will Cancel — switch dispatch to Path B `action:"run"` (see [`ci-cd-integration.md`](references/ci-cd-integration.md)).
+
+### UI tests fail randomly (intermittent green/red)
+
+**Likely causes:**
+- Timing — page not fully loaded before next step.
+- DOM changes between platform versions.
+- Browser-version mismatch.
+- **For workspace forms**: the `_I` actionable-components registry isn't populated until the page settles — see [`gotchas.md`](references/gotchas.md) § choice combobox.
+
+**Mitigations:**
+- Add explicit `wait_for_condition` steps before assertions that depend on freshly-loaded content.
+- Use stable accessibility attributes (`aria-label`, `data-testid`) over generated DOM positions.
+- Pin browser via `browser_name`/`browser_version` on dispatch — but confirm runner has it.
+- For workspace forms, consider whether ATF UI steps are the right tool — see [`gotchas.md`](references/gotchas.md) for the architectural ceiling.
+
+### Step outputs / variables don't resolve (`${variable}` appears literal)
+
+**Likely causes:**
+- The variable was never set by an upstream step.
+- Typo in the variable name (it's a string lookup, no compile-time check).
+- Wrong step order — the consumer runs before the producer.
+- Output set via `outputs.x = ...` but consumed as a different name.
+
+**Diagnose:**
+```bash
+# Inspect what the previous step's run actually emitted
+curl -u "$SN_ATF_USER:$SN_ATF_PASSWORD" \
+  "$SN_ATF_INSTANCE/api/now/table/sys_atf_test_result_step?sysparm_query=parent=<test_result_sys_id>&sysparm_fields=order,step_name,output_message,output"
+```
+Sort by `order` and verify each step's `output` column has the names you expect.
+
+### Test data not cleaned up — instance accumulates orphans
+
+**Likely causes:**
+- Teardown step missing.
+- Teardown errored before completing all deletes.
+- Test was cancelled before reaching teardown.
+
+**Mitigations:**
+- Use the factory pattern's `cleanup()` method which catches per-record errors and continues — see [`test-data-factory.md`](references/test-data-factory.md).
+- Add a backstop scheduled job that sweeps records matching a prefix older than 24 h.
+- Use run-markers — scope every fixture to a high-entropy run-id and have teardown delete by query, not by ledger.
+
+### CI/CD pipeline times out
+
+**Likely causes:**
+- Test suite genuinely takes longer than the CI timeout allowed.
+- Polling interval too long (you're catching completion late, not failing).
+- Runner stalled — test running but not progressing.
+
+**Mitigations:**
+- Set CI timeout to **2× the longest expected suite duration**, not 1×.
+- Polling interval: 30 s is a good default. Shorter wastes API; longer adds tail latency.
+- Split monolithic suites into smaller targeted ones — parallel dispatch with scheduled runners scales further than one giant suite.
+- Add a watchdog: if `percent_complete` doesn't advance over N polls, abort and investigate.
+
+### Step succeeds, but step description / result shows empty inputs
+
+**Cause:** The `glide_var` Table-API filter — you built the test via plain `POST /api/now/table/sys_atf_step` instead of through Path B or Fluent SDK. The row exists, but the inputs were silently dropped.
+
+**Fix:** This is exactly what this skill exists to solve. See § "The mental model" at the top of this document and [`architecture.md`](references/architecture.md) for the full explanation. Switch to one of:
+- **Fluent SDK** ([`fluent-sdk.md`](references/fluent-sdk.md)) — `.now.ts` source, `now-sdk build && now-sdk install`.
+- **Path B** ([`api-cheatsheet.md`](references/api-cheatsheet.md)) — `scripts/build_test.sh <spec>.json`.
+
 ## Reference index
 
 Read these on demand:
@@ -303,6 +426,8 @@ Read these on demand:
 | [references/gotchas.md](references/gotchas.md) | The known traps — `assert_type` values, encoded query syntax, MFA paths, namespace prefixes, choice fields vs labels. |
 | [references/api-cheatsheet.md](references/api-cheatsheet.md) | Every endpoint with curl examples — build, run, poll, results, discovery, cleanup. |
 | [references/fluent-sdk.md](references/fluent-sdk.md) | **Proven first-class path** — `@servicenow/sdk` Fluent (`.now.ts`). Setup, OAuth-with-MFA (zero admin), the `fluentDir` trap, literals-only AST, additive-install orphan remedy, the batching rule, classic-vs-workspace field-state, whitelist + calibration loop. Read this for "ATF tests as code". |
+| [references/ci-cd-integration.md](references/ci-cd-integration.md) | How to wire dispatch into Jenkins / GitHub Actions / Azure DevOps Pipelines. Includes the runner-type ceiling (`/api/sn_cicd/testsuite/run` needs a scheduled runner — Path B `action:"run"` works around it for dev/PoC), polling-loop patterns, parallel-suite notes, secrets handling. Read before writing CI yaml. |
+| [references/test-data-factory.md](references/test-data-factory.md) | The `ATFTestDataFactory` Script Include pattern: centralised fixture creation + ledgered cleanup. Conditional-skip pattern. Orphan-data backstops. Relationship to test-layer seed frameworks (Playwright / Cypress / pytest fixtures) at the UI/E2E layer. |
 
 ## Script index
 
