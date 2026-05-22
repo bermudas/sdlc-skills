@@ -515,3 +515,73 @@ Never assume field states: run the assertion, the failure tells the true
 state, correct, repeat. States are usually driven by OTHER fields — assert
 AFTER the trigger, in order. Asserting state *before* the change that causes
 it is the #1 authoring bug.
+
+---
+
+## Workspace SPA shadow-DOM ceilings — structural, not tooling
+
+### `assert_text_on_page` is blind to workspace SPA shadow DOM (field values, grid row-cells)
+
+**Symptom**: a record-form field is plainly visible in the workspace SPA, but `assert_text_on_page text='<value>'` fails with *"Text '<value>' was not on the page"*.
+
+**Cause**: the field text lives inside a chain of nested shadow roots (commonly 9+ deep on workspace forms: `now-input → sn-record-input-connected → now-record-form-section-column-layout → macroponent → sn-canvas-screen → sn-canvas-main → macroponent → sn-canvas-appshell-main → macroponent → body`). `document.body.innerText` does NOT include shadow-scoped text. The same applies to workspace grid row-cell content.
+
+**This is structural, not a tooling oversight.** ServiceNow's own documentation states custom client-side step environments are not a supported extension point (Tokyo+ docs). No future minor patch will close it. Washington DC (Feb 2024) added 2 workspace ATF step types — both declarative-action, neither field-value-assertion. Through Yokohama (2025) no additional workspace field-value step types were added. **Do not invest in a custom shadow-piercing step.**
+
+**Workaround**: server-side `record_query` proves the data layer; let Playwright (or any CDP-driven framework) own the UI rendering assertion. See `references/poc-bench-patterns.md` § Pattern 4 (hybrid coverage decision matrix) for the per-observable split.
+
+### Lazy virtualisation on workspace Details-tab record-form sections
+
+**Symptom**: even a shadow-walking JS expression returns empty results for a Details-tab section's field values.
+
+**Cause**: workspace SPA virtualises the section's child inputs — they aren't mounted in DOM until the section is scrolled into view (~2500/3200px on 1080p viewports). Empty results before scroll are an artifact of the renderer, not the data.
+
+**Implication**: even hypothetical client-side shadow-piercing would need to drive a scroll first. Combined with the no-custom-client-step constraint, this is another reason the ceiling is structural.
+
+### `assert_text_on_page` reads VISIBLE text, NOT aria-label / data attributes
+
+**Symptom**: an icon-only button (the `...` overflow trigger pattern, common across workspace toolbars) carries an `aria-label="More Actions"` but no visible text. `assert_text_on_page text='More Actions'` fails — yet the button is present in DOM.
+
+**Cause**: `assert_text_on_page` reads visible text content (innerText-equivalent). Aria-bound labels and data-attribute values are not included.
+
+**Workaround**: assert a downstream side-effect of clicking the affordance (if reachable via ATF) OR fall back to Playwright. There's no ATF primitive for attribute-based text assertion across the OOTB step catalogue.
+
+### Whitelist substring matching is NOT byte-exact for quote-rich errors
+
+**Symptom**: a `sys_atf_whitelist` row with the literal recurring error string (e.g. `Provided selected tab index '7' is not a valid index`) does NOT engage; the warning still fails the step.
+
+**Cause**: empirical — quote-rich and numeric-rich error strings don't reliably match the runner's substring comparison.
+
+**Workaround**: broaden the whitelist substring to strip quoted tokens and standalone numbers:
+
+```bash
+# Bad — quote-rich; engagement is unreliable
+./scripts/whitelist_error.sh <test_sys_id> "Provided selected tab index '7' is not a valid index"
+
+# Good — broader prefix substring engages reliably
+./scripts/whitelist_error.sh <test_sys_id> "Provided selected tab index"
+```
+
+Rule of thumb: **strip every quoted substring + every standalone number** from the error before whitelisting.
+
+### Single-runner state accumulation degrades workspace-SPA-open across dispatches
+
+**Symptom**: After 3-6 workspace-SPA-open tests in the same `sys_atf_agent` browser session, subsequent dispatches stall at `Open Workspace Page` — the test_result row sits in `state=1` for the full 600s ATF max-execution ceiling, `start_time` never populates on the step.
+
+**Cause**: workspace SPA holds session/cache state across navigations. After enough cumulative navigations to different sub-records / parent contexts, the SPA's internal state machine wedges and new `open_workspace` requests don't complete.
+
+**Workarounds** (in order of cost):
+1. **Cooldown ~6 min** between same-runner workspace dispatches (works for short bursts).
+2. **Operator restart** — close the runner browser tab, reopen `/atf_test_runner.do`. Resets the accumulator. Fresh budget for 3-6 dispatches.
+3. **Multi-runner partition** — provision a second `sys_atf_agent` on a different machine/session. Doubles throughput; load-balances.
+4. **Scheduled runner** (CI/CD) — switch from `type=manual` to `type=scheduled` runners. Avoids the manual-tab state problem entirely. Required by `/api/sn_cicd/testsuite/run`.
+
+**Fail-fast diagnostic**: if `Open Workspace Page` `start_time` doesn't populate within 60s of dispatch, assume state-accumulation. Cancel the run rather than waiting 600s.
+
+### `simple_name_values` input normalization (SP-category step types)
+
+**Symptom (closed by builder fix)**: SP-category step types (`open_service_portal_page`, `open_record_producer_sp`) rendered with empty-placeholder descriptions (`"Open  page in the  portal"` / `"Open Record Producer."`) after build, then timed out at 600s at runtime.
+
+**Root cause**: `query_params` input is type `simple_name_values`. The OOTB description-generator runs `JSON.parse(query_params || '{}')`. URL-encoded shape (`"a=1&b=2"`) makes `JSON.parse` throw — aborting the entire description regeneration and masking other inputs' successful writes.
+
+**Fix landed in `scripts/builder_operation.js`**: the builder normalizes URL-encoded `query_params` to JSON-object-string for SP-category step types. Spec authors can use either input shape — both pass through cleanly. See `references/poc-bench-patterns.md` § "`simple_name_values` normalization" for the full diff + diagnostic detector.

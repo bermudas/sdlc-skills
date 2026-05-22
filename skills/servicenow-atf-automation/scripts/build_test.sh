@@ -37,12 +37,14 @@ HTTP_CODE=$(curl -sS -X POST -u "$AUTH" \
 
 echo "▸ HTTP $HTTP_CODE" >&2
 
-if [[ "$HTTP_CODE" != "201" && "$HTTP_CODE" != "207" ]]; then
+if [[ "$HTTP_CODE" != "201" && "$HTTP_CODE" != "207" && "$HTTP_CODE" != "200" ]]; then
     echo "✗ Build failed" >&2
     python3 -m json.tool "$RESP_FILE" >&2 || cat "$RESP_FILE" >&2
     rm -f "$RESP_FILE"
     exit 1
 fi
+# Note: HTTP 200 is the success code for action:"update" (existing test
+# re-spec); 201 is for fresh creates; 207 is partial success (some step errors).
 
 TEST_SYSID=$(python3 -c "
 import json

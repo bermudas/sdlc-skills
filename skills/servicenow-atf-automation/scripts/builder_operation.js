@@ -120,7 +120,11 @@
             var common = ['component','component_values','function_to_call','action_parameters',
                           'hidden_parent_macroponent','returns','hidden_function_description',
                           'text','assert_type','workspace_page_url','user','table','field_values',
-                          'enforce_security'];
+                          'enforce_security',
+                          // SP-category inputs:
+                          'portal_id','page_id','catalog_item','query_params',
+                          // Misc reference-typed:
+                          'record_id','log','script','form_ui'];
             for (var j = 0; j < common.length; j++) {
                 try {
                     var v = s.inputs[common[j]];
@@ -129,6 +133,43 @@
                     }
                 } catch (e) {}
             }
+        }
+        // Extra dump: re-pull as a fresh GlideRecord and dump inputs via
+        // getVariablesRecord/getValue, which can surface the actual stored
+        // scalar even when getElements() returns null.
+        try {
+            var s2 = new GlideRecord('sys_atf_step');
+            if (s2.get(spec.stepSysId)) {
+                var vr = s2.inputs.getVariablesRecord ? s2.inputs.getVariablesRecord() : null;
+                if (vr) {
+                    var fields = vr.getFields();
+                    var iter = fields.iterator();
+                    out._inputs_via_variables_record = {};
+                    while (iter.hasNext()) {
+                        var f = iter.next();
+                        var fname = f.getName();
+                        var fval = f.getValue();
+                        var fdisp = '';
+                        try { fdisp = f.getDisplayValue() || ''; } catch (eD) {}
+                        if (fval || fdisp) {
+                            out._inputs_via_variables_record[fname] = {
+                                value: fval ? (fval + '') : '',
+                                display: fdisp + ''
+                            };
+                        }
+                    }
+                }
+                // Also dump key direct accessors known on SP step:
+                out._inputs_direct = {
+                    portal_id: s2.inputs.portal_id ? (s2.inputs.portal_id + '') : '',
+                    page_id: s2.inputs.page_id ? (s2.inputs.page_id + '') : '',
+                    catalog_item: s2.inputs.catalog_item ? (s2.inputs.catalog_item + '') : '',
+                    query_params: s2.inputs.query_params ? (s2.inputs.query_params + '') : '',
+                    user: s2.inputs.user ? (s2.inputs.user + '') : ''
+                };
+            }
+        } catch (eGV) {
+            out._inputs_via_variables_record_error = eGV.message;
         }
         response.setStatus(200);
         response.setBody(out);
@@ -353,6 +394,74 @@
         'test_page':                  true
     };
 
+    // ─────────── simple_name_values normalization (SP-category fix) ───────────
+    // Some SP-category step types (open_service_portal_page,
+    // open_record_producer_sp) take a `query_params` input of type
+    // `simple_name_values`. The OOTB description_generator runs
+    // `JSON.parse(step.inputs.query_params || '{}')`. If the caller passes a
+    // URL-encoded query string (e.g. "a=1&b=2&c=foo%20bar") JSON.parse throws
+    // → the description column falls back to a template literal ("Open
+    // Record Producer." / "Open  page in the  portal") → the runner cannot
+    // construct the right URL and times out at the 600s ATF ceiling.
+    //
+    // Fix: normalize URL-encoded form into a JSON object literal at the
+    // builder. Inputs already shaped as JSON pass through unchanged. Empty
+    // strings pass through unchanged. URL-encoded "key=value&..." is parsed
+    // and re-emitted as '{"key":"value", ...}'.
+    function normalizeSimpleNameValues(raw) {
+        if (raw === null || raw === undefined) return raw;
+        var s = ('' + raw).trim();
+        if (s === '') return s;
+        // Already JSON-shaped? Leave it.
+        if (s.charAt(0) === '{') return s;
+        // URL-encoded "key=value&key=value" — parse and reshape into JSON.
+        if (s.indexOf('=') >= 0) {
+            try {
+                var obj = {};
+                var pairs = s.split('&');
+                for (var pi = 0; pi < pairs.length; pi++) {
+                    var p = pairs[pi];
+                    if (!p) continue;
+                    var eq = p.indexOf('=');
+                    if (eq < 0) {
+                        obj[decodeURIComponent(p)] = '';
+                    } else {
+                        var k = decodeURIComponent(p.substring(0, eq));
+                        var v = decodeURIComponent(p.substring(eq + 1));
+                        obj[k] = v;
+                    }
+                }
+                return JSON.stringify(obj);
+            } catch (e) {
+                return s;
+            }
+        }
+        return s;
+    }
+
+    // Per-step-type list of inputs that need normalization. Extend as new
+    // simple_name_values failure modes surface during step-type probes.
+    var SIMPLE_NAME_VALUES_INPUTS = {
+        'open_service_portal_page': ['query_params'],
+        'open_record_producer_sp':  ['query_params']
+    };
+
+    // Post-write placeholder detector — catches "empty interpolation" bugs
+    // (where one or more glide_var inputs didn't persist, so the description
+    // generator falls back to the template literal) at BUILD time rather
+    // than at a 600s runner timeout. Restricted to known placeholder shapes
+    // because some OOTB descriptions legitimately render short ("Navigate
+    // to URL." for open_workspace with workspace_page_url set).
+    function isLikelyEmptyPlaceholder(desc) {
+        if (!desc) return true;
+        var trimmed = ('' + desc).replace(/\s+/g, ' ').trim();
+        if (trimmed.length === 0) return true;
+        if (/^Open(\s|\.)*$/i.test(trimmed)) return true;
+        if (/^Open\s+page\s+in\s+the\s+portal\.?$/i.test(trimmed)) return true;
+        if (/^Open\s+Record\s+Producer\.?$/i.test(trimmed)) return true;
+        return false;
+    }
+
     // 2. Create each step
     var createdSteps = [];
     var errors = [];
@@ -399,10 +508,19 @@
         // Special key: `_cols` writes directly to top-level columns on sys_atf_step
         // (e.g., mugshots_cache_json, snapshot, description). Use this for Custom
         // UI steps that need an inline mugshot cache.
+        var snvForType = SIMPLE_NAME_VALUES_INPUTS[s.type] || [];
         for (var key in s) {
             if (key === 'type' || key === 'active' || key === '_cols') continue;
             try {
-                step.inputs[key] = s[key];
+                var rawVal = s[key];
+                // Normalize URL-encoded query strings to JSON for
+                // simple_name_values inputs (otherwise description_generator
+                // throws on JSON.parse → step description renders as the
+                // template literal → runner times out at 600s).
+                if (snvForType.indexOf(key) >= 0) {
+                    rawVal = normalizeSimpleNameValues(rawVal);
+                }
+                step.inputs[key] = rawVal;
             } catch (e) {
                 errors.push({
                     step_index: i,
@@ -433,12 +551,42 @@
         }
         step.update();
 
+        // Post-write sanity check — refetch the description (display_value,
+        // which is what the runner uses) and warn if it looks like an unfilled
+        // placeholder. Catches "empty interpolation" regressions at build time
+        // rather than at a 600s runner timeout.
+        var resolvedDesc = '';
+        try {
+            var refetch = new GlideRecord('sys_atf_step');
+            if (refetch.get(stepId)) {
+                resolvedDesc = refetch.getDisplayValue('description') || '';
+            }
+        } catch (e) {
+            resolvedDesc = step.description.toString();
+        }
+        if (isLikelyEmptyPlaceholder(resolvedDesc)) {
+            errors.push({
+                step_index: i,
+                step_sys_id: stepId,
+                type: s.type,
+                step_config: configId,
+                description: resolvedDesc,
+                warning: 'Step description rendered with empty placeholders, meaning ' +
+                         'one or more glide_var inputs did not persist via ' +
+                         'step.inputs[key]=value. The step will likely time out at ' +
+                         'runtime (600s). Known-affected step types: ' +
+                         'open_service_portal_page, open_record_producer_sp. ' +
+                         'See references/poc-bench-patterns.md § simple_name_values ' +
+                         'normalization.'
+            });
+        }
+
         createdSteps.push({
             order: step.order.toString(),
             sys_id: stepId,
             type: s.type,
             step_config_name: step.step_config.name.toString(),
-            description: step.description.toString()
+            description: resolvedDesc || step.description.toString()
         });
     }
 

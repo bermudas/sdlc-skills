@@ -142,9 +142,13 @@ to it survive re-deploys.
 
 ### API surface
 
-`atf.<group>.<method>({ $id, ...inputs })`. Groups: `server`, `form`, `rest`,
-`catalog`, `applicationNavigator`, `email`, `reporting`,
-`responsiveDashboard`.
+`atf.<group>.<method>({ $id, ...inputs })`. Groups (11 total, per `now-sdk
+explain atf-guide`): `server`, `form`, **`form_SP`** (Service Portal form
+variants — `Test.d.ts` lines 347-565), **`catalog_SP`** (Service Portal
+catalog variants incl. record producers + multi-row variable sets —
+`Test.d.ts` lines 569-1000; note `openRecordProducer` param is
+`recordProducer:` NOT `catalogItem:`), `rest`, `catalog`,
+`applicationNavigator`, `email`, `reporting`, `responsiveDashboard`.
 - `server`: `impersonate`, `log`, `recordInsert`, `recordValidation`,
   `recordQuery`, `recordUpdate`, `recordDelete`, `runServerSideScript`, `createUser`.
 - `form`: `openNewForm`, `openExistingRecord`, `setFieldValue`, `submitForm`,
@@ -163,6 +167,16 @@ to it survive re-deploys.
 Fluent.** A workspace-navigation QTest cannot be click-driven via the SDK —
 use `openNewForm` (opens the form directly) + server-side outcome
 verification, or Path B's `open_workspace`.
+
+**SDK ≠ Path B escape hatch for custom-widget SP failures.** The SDK's
+`form_SP` / `catalog_SP` groups invoke the **same OOTB SP step-config sys_ids
+as Path B**, so they share the same runner-level ceiling on custom Service
+Portal widgets (the `g_form is not defined` failure on portals that ship
+widget overrides). The hopeful "use Fluent SDK to bypass the SP failure"
+path is **ruled out** — server-side persistence substitution via
+`run_server_script` is the correct workaround regardless of authoring
+channel. See `references/poc-bench-patterns.md` § "Destructive-cascade
+substitution" for the runtime evidence.
 
 ---
 
