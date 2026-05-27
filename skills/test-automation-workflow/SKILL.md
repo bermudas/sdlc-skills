@@ -151,11 +151,19 @@ If the case cannot be automated at all (e.g. physical card reader), the analyst 
 
 ### Phase 1 — Absorb
 
-Read the AFS end-to-end. Re-read `.agents/testing.md`. Open three neighbouring tests in the same feature area. If AFS § Status is not `ready-for-automation`, refuse:
+Read the AFS end-to-end. Re-read `.agents/testing.md`. Open three neighbouring tests in the same feature area. Check the AFS `Status` field against the slot contract (§ Implementer slot contract above):
 
-- `blocked` → report up to TAL with the unblock requirement.
-- `defect-found` → confirm the defect ticket exists in the project EPIC AND the AFS specifies handling (`expect.soft()` for isolated, let-it-fail-naturally for blocking). If unclear, refuse.
-- `un-automatable` → reject; analyst should not have sent this.
+| Status | Action |
+|---|---|
+| `ready-for-automation` | **Accept.** Standard six-phase loop — write a fresh spec. |
+| `extend-existing` | **Accept.** Read the covering spec named in AFS § Extension target end-to-end AND read its own AFS (typically in the same `test-specs/<feature>/` directory) so you know what's already proven. Then proceed through Phase 2–6 against AFS § Gap assertions only. The artefact you ship is an *edit to the covering spec*, not a fresh `.spec.ts`. |
+| `already-covered` | **Refuse.** No-implementation status — the `lcovered_<…>.md` AFS is a traceability artefact only. Return to TAL noting the misrouting. |
+| `out-of-scope-by-author` | **Refuse.** Analyst rejected at Phase 0 case-gate; should not reach implementer. Return to TAL. |
+| `blocked` | **Refuse.** Report to TAL with the unblock requirement. |
+| `defect-found` | **Conditional.** Confirm the defect ticket exists AND the AFS specifies handling (`expect.soft()` for isolated, let-it-fail-naturally for blocking). If unclear, refuse to TAL. |
+| `un-automatable` | **Refuse.** Analyst should not have routed this. |
+
+**This table is the single source of truth.** Orchestrator briefs, dispatch prompts, and project workflows defer to it. New statuses get added here first.
 
 ### Phase 2 — Explore (skip if AFS selectors are confirmed against current DOM)
 
@@ -168,6 +176,8 @@ If your Absorb pass surfaces a discrepancy between AFS selectors and the live DO
 
 Phase 2 has a budget: **30 minutes of exploration** before escalating to TAL.
 
+**For `extend-existing` AFS:** Phase 2 has an additional pre-step — read the covering spec end-to-end AND its own AFS (the one that authored it) before driving the live surface. The goal is to enter Phase 3 knowing *exactly* what's already proven, so the gap-fill is purely additive. If the covering AFS has been amended since the spec merged (selectors drifted, observable changed), surface that to TAL via `needs-analyst-rerun` *on the covering spec's case*, not on yours — the covering spec is unstable upstream and your extension would land on shifting ground.
+
 ### Phase 3 — Automate
 
 Write the test. Follow the framework's conventions 1:1. Five rules (full detail in § Hard Rules below):
@@ -179,6 +189,16 @@ Write the test. Follow the framework's conventions 1:1. Five rules (full detail 
 5. No `waitForTimeout` / `sleep`. Use web-first assertions.
 
 Apply the **No Defect Masking Rule** (§ Hard Rules → 2 below). Forbidden: `test.fail()`, `xit()`, `@Ignore`, `pytest.skip()`, demoted expects, weakened assertions.
+
+#### Phase 3 for `extend-existing` AFS
+
+When the AFS status is `extend-existing`, the artefact is an *edit to the covering spec*, not a fresh `.spec.ts`. Three mechanics differ from a fresh implementation:
+
+1. **Additive-only on the covering spec.** The spec file is the shared-caller file (Hard Rule 3 → § Additive-only on shared-caller files applies): existing `test()` bodies stay byte-identical; new `test()` blocks (or new `test.step()` sections, or new `expect()` lines inside an existing test only when the AFS Gap assertions section names that exact insertion point) sit alongside. Verify with `git diff <covering-spec> | grep -E '^-[^-]' | head` → empty.
+
+2. **Coverage tag chain.** Append `@<NEW-TMS-ID>` to the covering spec's `test.describe()` title alongside the existing `@<COVERING-TMS-ID>` tag. The describe-title tag list is the engagement-level coverage signal; each Jira/TMS case referenced by the spec gets its own tag in that list. Don't create a sibling `describe` block — that would fragment the cluster.
+
+3. **Same-PR amendment if the AFS drifts.** If Phase 2 surfaces an observation that the AFS § Gap assertions section didn't anticipate, amend the AFS via the Phase 2 amend-in-PR rule and ship the AFS update in the same PR — same as fresh implementation. If the amendment widens scope to the point of being a near-rewrite of the covering spec, return `needs-analyst-rerun` and ask analyst to reclassify (typically `ready-for-automation` with a split).
 
 ### Phase 4 — Execute
 
@@ -263,6 +283,8 @@ Missing fields are unacceptable — every field has a defensible "none" or "n/a"
 
 **Two-verdict split.** Your implementer-local verdict (your `N/M`) is what *you* observed running the spec in your workspace. The **Independent-gate verdict** is what *TAL* observes running the merged spec independently against the live environment — and that's the merge signal, not yours. Leave the independent-gate row blank; TAL fills it. Don't conflate the two: a GREEN N/N implementer-local + RED 1/3 independent-gate is a real outcome class (environment drift / parallel interaction / fresh-credential interaction), and the format must distinguish them.
 
+**For `extend-existing` AFS, the verdict scopes the entire extended spec.** Run the covering spec end-to-end (original `test()` blocks + your appended ones); your `N/M` covers all of them. A GREEN delta + RED original is a regression — the additive-only contract broke. Same merge gate as any other regression: block until additive-only is restored OR follow the shared-file regression protocol (enumerate affected callers, name re-run results in the PR description). TAL's independent-gate verdict applies to the full extended spec too — same scope, different runner.
+
 ---
 
 ## Hard Rules — implementer
@@ -326,6 +348,8 @@ When the page object / fixture / helper you're editing has **≥3 merged callers
   ```bash
   git diff <file> | grep -E '^-[^-]' | head     # should be empty — no real removals
   ```
+
+**The spec file itself counts as a shared-caller file when AFS status is `extend-existing`.** The covering spec is your edit target; the original `test()` bodies stay byte-identical alongside the new ones you append. Run the same `grep -E '^-[^-]'` verification on the spec diff. The mechanics are identical — the "callers" of an existing `test()` block are downstream CI / TMS back-write / coverage reporters; modifying the test body breaks their state silently.
 
 If the change genuinely cannot be additive (the existing method is broken, or the API needs to change), follow the shared-file regression protocol:
 
