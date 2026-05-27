@@ -30,6 +30,56 @@ flags defects, and only then produces a spec.
 - **No skipping exploration.** Even if the TMS case looks complete,
   execute it. The case describes intent; only execution reveals truth.
 
+## Analyst slot contract
+
+This skill IS the analyst slot in the test-automation pipeline. When
+dispatched — by an orchestrator like `test-automation-lead`, or
+standalone for "analyse SCRUM-T101" — role, context, parameters, and
+return shape are fixed here so dispatch prompts don't have to inline
+them.
+
+**Role.** Execute one TMS test case end-to-end against the live app,
+capture stable selectors, classify the finding, emit an AFS. No
+automation code (see § Absolute boundaries).
+
+**Session context — read once at session start.** Typically
+auto-imported via `@-blocks` in your agent's `AGENT.md`; if your
+agent doesn't auto-import, read them now:
+
+- `.agents/profile.md` — project systems, base URL, credentials
+  matrix, sample users, bug filing target
+- `.agents/workflow.md` — branch/PR rules, EPIC pattern
+- `.agents/testing.md` — framework, locator strategy, TMS case-gate
+  exclusion list
+- `.agents/memory/<your-agent>/project_briefing.md` — accumulated
+  project gotchas from prior sessions
+- `.agents/architecture.md` — the surfaces you'll touch (also
+  referenced in Phase 2)
+
+Missing context → flag the gap; don't fabricate defaults.
+
+**Per-case parameters** (caller provides at dispatch time):
+
+- TMS case ID (e.g. `SCRUM-T101`)
+- User set — a key into `.agents/profile.md` § Roles & sample users
+  (e.g. `${TEST_USER}` / `${TRIAL_USER}`)
+- Base URL — usually from `.agents/profile.md`, but caller may
+  override
+- EPIC parent key — for defect filing under `story-subtask` style
+
+**Return contract:**
+
+- **Status** — one of `ready-for-automation` / `already-covered` /
+  `extend-existing` / `blocked` / `defect-found` /
+  `out-of-scope-by-author` / `un-automatable`. Full semantics in
+  Phase 0 (out-of-scope) and § 5 Classify findings (the rest).
+- **AFS path** — `test-specs/<feature>/l<pri>_<slug>_<tms-id>.md`
+  for fresh-implementation, `lcovered_*` for already-covered,
+  `lextend_*` for extend-existing. Omitted for `un-automatable` and
+  `out-of-scope-by-author` (no AFS emitted).
+- **Filed bug IDs** — if `defect-found`, the tracker IDs created
+  per § 5's bug-filing routing.
+
 ## Phase 0 — Case-gate (preflight, runs BEFORE Phase 1)
 
 Before fetching the case body, probe its TMS author metadata. Skip cases the author has marked as not actionable — there's no analyst value in executing them, and downstream the implementer / TAL will reject them.

@@ -17,6 +17,43 @@ If you arrived here looking for routing / slot defaults / "when to involve tech-
 
 **Why split the work across slots:** context. The analysis pass carries exploration state (DOM snapshots, test data, console noise). The automation pass carries framework state (page objects, fixtures, CI config). The review pass carries adversarial-eye state (assertion strength, masking suspicion). Cramming all of that into one session breaks the bot; the slot split keeps each workspace lean.
 
+## Implementer slot contract
+
+This skill IS the implementer slot in the test-automation pipeline. When dispatched — by an orchestrator like `test-automation-lead`, or standalone for "implement the AFS at `<path>`" — role, context, parameters, and return shape are fixed here so dispatch prompts don't have to inline them.
+
+**Role.** Take a `ready-for-automation` or `extend-existing` AFS, write the spec (and any required page-object / fixture changes), run it green N times locally, hand back a PR-ready diff plus a Run Report. Full mechanics in § Implementer six-phase loop and § Hard Rules — implementer below.
+
+**Session context — read once at session start.** Typically auto-imported via `@-blocks` in your agent's `AGENT.md`; if your agent doesn't auto-import, read them now:
+
+- `.agents/profile.md` — project systems, base URL, sample users
+- `.agents/workflow.md` — branch/PR rules, commit authority
+- `.agents/testing.md` — framework, run commands, locator strategy, POM conventions
+- `.agents/architecture.md` — surfaces under test
+- `.agents/memory/<your-agent>/project_briefing.md` — accumulated project gotchas
+- This skill's § Hard Rules — implementer (the forbidden list and additive-only rule)
+
+Missing context → flag the gap; don't fabricate defaults.
+
+**AFS gate** (refuse and return if violated — analyst output drives this):
+
+- Accept: `ready-for-automation` (fresh spec) or `extend-existing` (extend the named covering spec per the AFS's Gap assertions section).
+- Refuse: `already-covered` (no implementation needed — traceability AFS only), `blocked`, `defect-found`, `un-automatable`, `out-of-scope-by-author`.
+
+**Per-case parameters** (caller provides at dispatch time):
+
+- TMS case ID
+- AFS path
+- User set — a key into `.agents/profile.md` § Roles & sample users (e.g. `${TEST_USER}`)
+- Branch name — if the caller created the branch. **Don't `switch`, `commit`, `push`, or otherwise touch git unless `.agents/workflow.md` grants commit authority to this slot.**
+
+**Retry budget.** Soft limit: **≤ 2 reruns** against the same root cause before escalating. The TAL's R2 cap rule will refuse R3 on the same cause regardless — see `agents/test-automation-lead/AGENT.md` § R2 cap rule.
+
+**Return contract:**
+
+- PR-ready diff (spec + page objects + fixtures in one commit set)
+- Run Report per § Run Report — mandatory template (classification + evidence)
+- If escalating after R2: name the class (architectural / AFS-drift / product-change) so the TAL routes correctly
+
 ## The eight steps (IC view)
 
 ```
@@ -353,10 +390,33 @@ The rule sequence: Rule 7 (reuse before create) tells you to find an existing he
 
 ## Reviewer slot
 
-Two reviewers in parallel (TAL dispatches both):
+This section IS the reviewer-slot contract for test-automation PRs. When dispatched — by an orchestrator like `test-automation-lead`, or standalone for "review test PR #N" — role, context, parameters, and return shape are fixed here so dispatch prompts don't have to inline them. (Generic review mechanics — checklist categories, output format — live in the separate `code-review` skill, loaded alongside.)
 
-- **`qa-engineer` (Sage) — fresh session** with the `code-review` skill loaded. Reviewer must be explicitly informed they did NOT write the code, to keep the review adversarial. See `code-review` skill for the review prompt template.
+**Role.** Adversarial review of a test-automation PR. **You did NOT write this code** — that framing is mandatory; without it the review collapses into rubber-stamp. Two reviewers in parallel:
+
+- **`qa-engineer` (Sage) — fresh session** with the `code-review` skill loaded for generic review mechanics. This section adds the test-automation-specific expectations (triangulation, standing checks).
 - **Optional `tech-lead` (Rio)** for framework-scale changes only — not for routine test PRs.
+
+**Session context — read once at session start.** Typically auto-imported via `@-blocks` in your agent's `AGENT.md`; if not, read now:
+
+- `.agents/profile.md`, `.agents/workflow.md`, `.agents/testing.md`, `.agents/architecture.md` — same set as analyst/implementer
+- `.agents/memory/<your-agent>/project_briefing.md` — accumulated gotchas
+- This skill's § Triangulate three artifacts and § Standing reviewer checks below
+
+Missing context → flag the gap; don't fabricate defaults.
+
+**Per-case parameters** (caller provides at dispatch time):
+
+- TMS case ID
+- AFS path — the analyst's translation (one of the three artifacts you triangulate)
+- PR ID / branch — the implementation (the second artifact)
+- The TMS case itself — fetched via your project's TMS adapter (the third artifact)
+
+**Return contract:**
+
+- Verdict: `APPROVED` | `CHANGES_REQUESTED`
+- Findings list with `file:line` refs (Critical / Important / Nit per the `code-review` skill's Output Format)
+- Recommendation: ship vs amend. The TAL decides final disposition; reviewer recommends.
 
 ### Triangulate three artifacts — never two
 
