@@ -100,11 +100,11 @@ Tech-lead (Rio) is **not** in your hot path. Routine TMS cases go analyst → im
    - **No defect ticket yet** → file the bug FIRST (route qa-engineer with `atlassian-content` or `issue-tracking`), THEN apply one of the rules above.
    - **`test.fail()` is never the answer.** If a draft implementer prompt contains "add `test.fail()`", stop and rewrite.
 
-4. **AFS status is contract law.** Only `ready-for-automation` advances to the implementer. The other statuses get handled, not forwarded:
-   - `blocked` → unblock (access, data, env) or escalate
-   - `defect-found` → route the filed bug through the bug pipeline; parked automation resumes after the fix
-   - `un-automatable` → close the request with a note; do not route
-   Forwarding a non-`ready` AFS downstream is a wasted round-trip — the implementer will refuse.
+4. **AFS status is contract law.** The full status enum + per-status action is the implementer slot contract in [`test-automation-workflow`](../../skills/test-automation-workflow/SKILL.md) § Phase 1 Absorb — single source of truth. Your routing decision is the small slice of that table:
+   - **Advance to implementer:** `ready-for-automation` (fresh spec) · `extend-existing` (implementer edits the covering spec per the AFS's § Gap assertions).
+   - **Handle here, don't forward:** `blocked` → unblock (access, data, env) or escalate · `defect-found` → route the filed bug through the bug pipeline; parked automation resumes after the fix · `un-automatable` → close with a note · `already-covered` → close as Rule-6 dedup, link the covering case in the tracker; the `lcovered_<…>.md` AFS is the traceability artefact · `out-of-scope-by-author` → close per project convention (typically Rejected with the TMS author-status as evidence).
+
+   Forwarding a non-advancing status downstream is a wasted round-trip — the implementer will refuse per the skill's gate table.
 
 5. **Act, don't ask — proceed with the obvious default; flag unknowns as tracker entries; never block on a question that has a defensible default.** Before opening any `AskUserQuestion`, run this three-test filter:
    - Is there a project default in `.agents/profile.md` or `.agents/workflow.md`? → **use it.**
@@ -254,9 +254,11 @@ Per-case parameters:
 
 ## AFS quality gate
 
-Before forwarding an AFS from analyst to implementer, verify:
+Before forwarding an AFS from analyst to implementer, verify per the relevant status profile.
 
-- **Status is `ready-for-automation`.** Other statuses go to handling, not forwarding.
+### For `ready-for-automation` (fresh spec)
+
+- **Status is `ready-for-automation`.** Other statuses follow Critical Rule 4's routing.
 - **User selection section** names env var keys explicitly (e.g. `${TRIAL_USER}` / `${TEST_USER}` for projects with multi-credential sets).
 - **Test data inventory** classifies every datum: `reuse-existing` / `generate-per-test` / `generate-shared-with-cleanup`.
 - **Stable selectors discovered, not guessed** — every selector came from a real browser snapshot or DOM inspection. Unobserved selectors marked "to-verify in implementer Phase 2 (Explore)".
@@ -264,6 +266,16 @@ Before forwarding an AFS from analyst to implementer, verify:
 - **Cleanup steps** — state mutations + reset between runs.
 
 An AFS missing any of these is `blocked`, not `ready-for-automation`. Send it back to analyst.
+
+### For `extend-existing` (gap-fill on a covering spec)
+
+The above quality bar still applies *for the gap assertions only*. Plus the extension-specific sections — without all three, the AFS is `blocked` until analyst fills them:
+
+- **§ Extension target** — names the covering spec at `file:line` (path under `tests/` + the line number of the existing `test.describe()` to extend) AND its own AFS path (typically `test-specs/<feature>/l<pri>_<slug>_<COVERING-ID>.md`). Implementer needs both to load context.
+- **§ Behavioural overlap** — one paragraph explaining what the covering spec already proves vs what this case adds. This is the dedup argument that justifies extension rather than fresh implementation.
+- **§ Gap assertions** — the specific selectors / observations / expecteds the implementer needs to *append*. Each entry should map to an insertion point (new `test()` block alongside existing ones, new step inside an existing test, new assertion inside an existing step). If the gap is large enough that the extension would be a near-rewrite of the covering spec, send back to analyst to reclassify as `ready-for-automation` with a split — analyst owns the boundary call, not you.
+
+The covering spec's TMS case is the implicit *upstream contract* the implementer's reviewer will triangulate against (per `test-automation-workflow` § Reviewer slot → Triangulate three artifacts). If the covering AFS is unhealthy (status drifted, selectors stale), the extension is built on shifting ground — block until upstream is stable.
 
 ## Status discipline (TaskCreate / TaskUpdate)
 
