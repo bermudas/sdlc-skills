@@ -206,79 +206,51 @@ Use these verbatim, substituting `{PLACEHOLDER}` fields.
 
 #### Analyst dispatch (qa-engineer + test-case-analysis)
 
+The skill carries the slot contract (role, session context, return shape) —
+see `skills/test-case-analysis/SKILL.md` § Analyst slot contract. The
+dispatch prompt just passes per-case parameters:
+
 ```
-You are the **analyst slot** for {TMS_ID}.
+Analyst slot — analyse {TMS_ID} per `test-case-analysis` skill § Analyst slot contract.
 
-Project context (read at session start; auto-imported via @-blocks):
-- .agents/profile.md — project systems, base URL, credentials matrix
-- .agents/workflow.md — branch/PR rules and EPIC pattern
-- .agents/testing.md — framework, run commands, locator strategy
-- .agents/memory/qa-engineer/project_briefing.md — project-specific gotchas
-
-User set: {USER_SET} (per .agents/profile.md § Roles & sample users).
-
-TMS adapter: {qaspace | xray-testing | testrail-... | markdown}.
-  Fetch the case with ALL core fields (steps + expected). Adapter-specific
-  field lists live in the adapter's SKILL.md.
-
-Execute against {BASE_URL} end-to-end. For defects, file via the
-`atlassian-content` skill (Jira) or `issue-tracking` (other trackers)
-under EPIC {EPIC_KEY}. Re-fetch and repair any flat-body issues.
-
-Emit AFS at: test-specs/<feature>/l<pri>_<slug>_{TMS_ID}.md
-
-Return status: ready-for-automation | blocked | defect-found | un-automatable.
+Per-case parameters:
+- TMS case ID: {TMS_ID}
+- User set: {USER_SET}
+- Base URL: {BASE_URL}
+- EPIC parent (for defect filing): {EPIC_KEY}
 ```
 
 #### Implementer dispatch (test-automation-engineer + test-automation-workflow)
 
+The skill carries the slot contract (role, session context, AFS gate, retry budget, return shape) —
+see `skills/test-automation-workflow/SKILL.md` § Implementer slot contract. The
+dispatch prompt just passes per-case parameters:
+
 ```
-You are the **implementer slot** for {TMS_ID}.
+Implementer slot — implement {TMS_ID} per `test-automation-workflow` skill § Implementer slot contract.
 
-AFS: {AFS_PATH}. Refuse if status != ready-for-automation.
-
-Phases: Absorb → Explore (if AFS selectors don't match observed DOM) →
-Automate → Execute → Debug → Handoff.
-
-User set: {USER_SET}.
-
-Branch: {BRANCH_NAME} (I created it — do NOT switch, commit, push, or
-touch git unless you're the dedicated implementer and this project's
-workflow.md gives you commit authority).
-
-Forbidden: test.fail(), xit(), @Ignore, expect()→console.warn,
-weakened assertions, page.evaluate() bypasses. See
-`test-automation-workflow` § No Defect Masking.
-
-Soft retry budget: ≤ 2 reruns against the same root cause; then escalate.
-
-Return: PR-ready diff + Run Report (template in test-automation-workflow).
+Per-case parameters:
+- TMS case ID: {TMS_ID}
+- AFS path: {AFS_PATH}
+- User set: {USER_SET}
+- Branch (I created it; do NOT touch git unless workflow.md authorises): {BRANCH_NAME}
 ```
 
 #### Reviewer dispatch (qa-engineer FRESH session + code-review)
 
+The skill carries the slot contract (role, session context, triangulation, standing checks, return shape) —
+see `skills/test-automation-workflow/SKILL.md` § Reviewer slot. The
+dispatch prompt just passes per-case parameters:
+
 ```
-You are the **reviewer slot** for {TMS_ID} — you did NOT write this code.
+Reviewer slot — review PR #{PR_ID} for {TMS_ID} per `test-automation-workflow` skill § Reviewer slot.
+**You did NOT write this code** — adversarial eye, fresh session.
 
-Another qa-engineer wrote the AFS at {AFS_PATH}.
-A test-automation-engineer implemented PR #{PR_ID}.
-
-Load `code-review` skill. Review with an adversarial eye.
-
-Check:
-- Assertion strength (no demoted expects, no missing toBeEnabled guards)
-- Selector stability (locator ladder per testing.md)
-- Defect masking (no test.fail, no xit, no weakened assertions)
-- POM discipline (no raw selectors in spec files)
-- Naming + dead code
-- AFS amendments — any selector drift between AFS and implementation must
-  be reflected in an AFS docs commit
-
-Verdict: APPROVED | CHANGES_REQUESTED with file:line findings.
-Return findings list; I decide ship-vs-amend.
+Per-case parameters:
+- TMS case ID: {TMS_ID}
+- AFS path (one of the three artifacts to triangulate): {AFS_PATH}
+- PR ID: {PR_ID}
 ```
-
-Always name the slot in the prompt. Without that framing, the reviewer subagent might assume it wrote the code and rubber-stamp it.
 
 ## AFS quality gate
 
