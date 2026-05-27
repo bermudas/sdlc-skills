@@ -58,7 +58,7 @@ Before fetching the case body, probe its TMS author metadata. Skip cases the aut
 2. Read app context       → .agents/architecture.md + previous AFS files
 3. Execute                → browser-driving capability (your agent's wired MCP), step-by-step
 4. Capture selectors      → stable, accessible, fallback-ready
-5. Classify findings      → ready / already-covered / blocked / defect-found / un-automatable
+5. Classify findings      → ready / already-covered / extend-existing / blocked / defect-found / un-automatable
 6. Emit AFS               → test-specs/<feature>/l<pri>_<slug>_<tms-id>.md
 ```
 
@@ -142,6 +142,23 @@ Status per case (goes in the AFS metadata block):
   resolves both ways. The `lcovered_` filename prefix is the
   contract — downstream audits grep for it to enumerate
   Rule-6-dedup coverage distinct from fresh-implementation coverage.
+- **extend-existing** — Rule-6 *partial*-overlap. An existing merged
+  spec covers most of this case's observable, but a small number of
+  assertions are missing. Don't write a fresh `.spec.ts`; the
+  implementer extends the covering spec with the gap assertions.
+  Emit an *extension AFS* at
+  `test-specs/<feature>/lextend_<slug>_<tms-id>.md` containing: the
+  covering spec at `file:line`, a one-paragraph behavioural-overlap
+  argument (what's already proven), and a **Gap assertions** section
+  listing exactly what the existing spec doesn't cover (the new
+  selectors / observations / expecteds the implementer needs to
+  append). Link the TMS case to the covering one in the tracker.
+  The `lextend_` filename prefix is the contract — downstream audits
+  distinguish extension work from fresh-implementation and from full
+  `lcovered_` dedup. Boundary call: if the gap is large enough that
+  the extension would be a near-rewrite of the covering spec, treat
+  as `ready-for-automation` instead and let the implementer decide
+  whether to extend or split.
 - **blocked** — analyst hit a wall (access, data, env); the AFS's
   "Blocked Steps" section lists what's needed to unblock
 - **defect-found** — real product bug prevents completion. File the
@@ -319,6 +336,12 @@ When the AFS is ready:
 - **Re-implementing a case whose observable is already proven by
   another merged spec.** Rule-6 dedup → `already-covered` with a
   traceability AFS (`lcovered_*.md`), not a duplicate `.spec.ts`.
+- **Filing partial overlap as fresh `ready-for-automation`.** When
+  an existing merged spec covers most of the observable and only a
+  small number of assertions are missing, classify as
+  `extend-existing` with `lextend_*.md` + a Gap assertions section.
+  Forcing the implementer to rediscover the overlap defeats Rule-6
+  dedup and ends with two specs asserting the same behaviour.
 
 ## References
 
