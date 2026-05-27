@@ -160,7 +160,7 @@ Classify the failure honestly:
 | **Product-isolated** (one assertion fails for product reason, rest of flow works) | `expect.soft()` with `// Known defect: <TICKET>` comment. File the defect via `atlassian-content` / `issue-tracking` if not already filed. |
 | **Product-blocking** (downstream steps can't run) | **Let it fail naturally.** File the defect. Return task status `blocked` to TAL. Forbidden: `test.fail()`. |
 
-**Soft retry budget:** ≤ 3 reruns against the same root cause. After the 3rd, **stop and escalate to TAL** with the rerun count + root-cause notes per rerun. Fishing your way to green is a smell, not a strategy.
+**Soft retry budget:** ≤ 2 reruns against the same root cause. After R2, **stop and return `needs-tal`** with the rerun count + root-cause notes per rerun. TAL applies the R2 cap rule (escalate to architectural / re-route to analyst / park — never R3). Fishing your way to green by R3+ is a smell, not a strategy: empirically R1→R2 fixes most things, R3 either parks anyway or is wasted effort.
 
 Read failure artifacts: `test-results/`, `playwright-report/`, `allure-results/`, `error-context.md`. The framework usually pinpoints the exact mismatch.
 
@@ -207,7 +207,8 @@ End every implementer / runner session with this exact structure (no prose summa
 
 ```markdown
 ## Run Report — {TEST_TAG}
-- **Verdict:** GREEN | RED | BLOCKED
+- **Implementer-local verdict:** GREEN N/M | RED N/M | BLOCKED  (you fill this in)
+- **Independent-gate verdict:** (TAL fills this after the independent live-run gate; implementer leaves blank)
 - **Duration:** {n}s
 - **Steps passed:** (list each AFS step that ran clean, by name)
 - **Failed step:** {step name} — POM method {Page.method()} — {file:line}
@@ -222,6 +223,8 @@ End every implementer / runner session with this exact structure (no prose summa
 ```
 
 Missing fields are unacceptable — every field has a defensible "none" or "n/a" value if not applicable.
+
+**Two-verdict split.** Your implementer-local verdict (your `N/M`) is what *you* observed running the spec in your workspace. The **Independent-gate verdict** is what *TAL* observes running the merged spec independently against the live environment — and that's the merge signal, not yours. Leave the independent-gate row blank; TAL fills it. Don't conflate the two: a GREEN N/N implementer-local + RED 1/3 independent-gate is a real outcome class (environment drift / parallel interaction / fresh-credential interaction), and the format must distinguish them.
 
 ---
 
@@ -250,6 +253,21 @@ Missing fields are unacceptable — every field has a defensible "none" or "n/a"
 - Using `test.fail()` / `xit()` / `@Ignore` / `pytest.skip()` to hide a real product bug
 - Re-scoping: "this assertion belongs to a different test so I'll delete it from this one" — if the AFS says assert it, assert it
 
+#### Reverse-masking guard (case-text drift from live product)
+
+Masking is bi-directional. The case text is a *hypothesis*; the live product is ground truth. Weakening an assertion *away from* a real defect is the obvious masking class. Weakening an assertion *toward* the case text when live product correctly diverges is **also** masking — it asserts a stale hypothesis as if it were the contract:
+
+| Case text says | Live product does | Wrong — reverse-masking | Right — live-contract |
+|---|---|---|---|
+| Tap target ≥44px (WCAG AAA) | Tap target = 40px (per current design spec) | `expect(box.height).toBeGreaterThanOrEqual(44)` — fails on a non-defect | `expect(box.height).toBeGreaterThanOrEqual(40)` + file CLARIFICATION on case-text drift |
+| "Save button visible on form" | Save button correctly removed in v2 redesign | `expect(saveBtn).toBeVisible()` — fails on intentional change | `expect(saveBtn).toHaveCount(0)` + CLARIFICATION |
+| Field labelled "Customer" | Field labelled "Constituent" (legacy term, behaviour identical) | Assert "Customer" — fails on cosmetic | Assert "Constituent" + CLARIFICATION |
+| Step "click confirm dialog" | No confirm dialog (removed in flow simplification) | `expect(dialog).toBeVisible()` — fails on improved UX | Skip the step in the spec + CLARIFICATION; AFS amended via Phase 2 amend-in-PR |
+
+**The case-text drift is itself a finding** — it goes in the AFS as a CLARIFICATION (lightweight ticket per the project's `Bug filing style`), not as a Bug. Asserting the stale case-text to "honour" the TMS is masking in the opposite direction.
+
+Why this matters empirically: the test will pass-by-luck on the next product change that happens to land on the asserted value, then fail unpredictably when the product moves again. The live-contract assertion is durable.
+
 > **TAL-side gate.** TAL also enforces this rule. Any dispatch prompt that explicitly instructs the implementer to use `test.fail()` / `xit()` / `@Ignore` / `pytest.skip()` for a product defect is a hard failure on TAL, not the implementer. If your dispatch prompt says "add `test.fail()`", refuse and route back to TAL with the violation noted.
 
 **A red test exposing a real product bug is a correct test.** Your job is to keep it honest, not to keep it green.
@@ -260,6 +278,26 @@ Missing fields are unacceptable — every field has a defensible "none" or "n/a"
 - If a page object doesn't exist for the surface you're testing, create it — in the exact style the existing ones use.
 - Centralize selectors in the page object. A `data-testid` should appear in exactly one file.
 - Semantic method names (`login()`, `applyPromoCode()`), not `clickButton3()`.
+
+#### Additive-only on shared-caller files
+
+When the page object / fixture / helper you're editing has **≥3 merged callers** (`grep -rl '<method-name>' tests/ | wc -l`), default to pure-append patches:
+
+- Add new methods alongside existing ones — never modify the body of an existing method that merged callers depend on.
+- Existing tests that need different behaviour use the new method; the old method stays byte-identical.
+- Verify the additive contract before commit:
+  ```bash
+  git diff <file> | grep -E '^-[^-]' | head     # should be empty — no real removals
+  ```
+
+If the change genuinely cannot be additive (the existing method is broken, or the API needs to change), follow the shared-file regression protocol:
+
+1. Enumerate every affected caller: `grep -rl '<method>' tests/`.
+2. Re-run all of them locally before opening the PR.
+3. Name every affected spec + its re-run verdict in the PR description.
+4. If any affected spec fails post-modification, either make the change backward-compatible (additive) or amend the failing specs in the same PR.
+
+Silent modification of a shared method called by N merged specs is how regression-by-stealth ships. Additive-default is the cheap path; full-regression-with-evidence is the explicit path; neither path is "trust me, the change is safe."
 
 ### 4. Environment variables, never hardcoded values
 
@@ -298,6 +336,19 @@ When a test fails and the helper has worked for other tests, suspect the test fi
 
 If the AFS test-data inventory declares shared state across steps or tests in the file, set serial mode (`test.describe.configure({ mode: 'serial' })` or the framework equivalent). Parallel execution on shared state is a flake source, not a feature.
 
+### 10. Read-only-by-default
+
+Before writing seed-and-cleanup logic, ask: **can this observable be asserted on existing stable data?**
+
+- If YES — prefer it. Pick a stable existing record matching the AFS's data predicates; assert against it; no setup, no teardown. **Zero-leak by construction, parallel-safe by construction** — the strongest cleanliness posture available, because there's no mutation to leak.
+- If NO (the observable inherently requires fresh state — new-document upload, new-relationship, new-case): seed minimally, cleanup loudly.
+
+You (implementer) are the right person to make this call — you've seen the surface in Phase 2 Explore. If the AFS specifies seed-and-cleanup but your exploration shows the observable can be satisfied read-only on stable existing data, **amend the AFS via the Phase 2 amend-in-PR rule and ship read-only.**
+
+Why this matters empirically: seed/cleanup is the largest flake source in any non-trivial suite — state leaks across tests, fixtures interact with parallel runners, cleanup race conditions. Eliminating the mutation eliminates the entire flake class.
+
+The rule sequence: Rule 7 (reuse before create) tells you to find an existing helper; this rule tells you to find existing **data**. Both are the same instinct — prefer what's already proven stable over freshly-built state.
+
 ---
 
 ## Reviewer slot
@@ -307,13 +358,33 @@ Two reviewers in parallel (TAL dispatches both):
 - **`qa-engineer` (Sage) — fresh session** with the `code-review` skill loaded. Reviewer must be explicitly informed they did NOT write the code, to keep the review adversarial. See `code-review` skill for the review prompt template.
 - **Optional `tech-lead` (Rio)** for framework-scale changes only — not for routine test PRs.
 
-Reviewer checks:
-- Assertion strength (no demoted expects, no missing toBeEnabled guards)
+### Triangulate three artifacts — never two
+
+The reviewer's mandatory triangle:
+
+1. **Original TMS case** — fetch via the project's TMS adapter (full fields, not summary view). This is the *upstream contract*.
+2. **AFS** at `test-specs/<feature>/l*_<id>.md` — the analyst's translation of (1).
+3. **Implementation** — the PR diff, the spec, the page-object changes.
+
+A reviewer who looks only at AFS ↔ implementation is doing half the job — they miss the class of bug where the AFS itself drifted from the TMS case. Three failure modes, three responses:
+
+| Pattern | Verdict |
+|---|---|
+| AFS faithful to TMS case + implementation faithful to AFS | APPROVED |
+| AFS faithful, implementation drifts | CHANGES_REQUESTED (implementer fix) |
+| AFS drifts from TMS case | Either: (a) amend AFS back to faithful translation AND ship the AFS update in the same PR, or (b) document the drift as a CLARIFICATION under Reverse-masking guard (live product diverges from case-text, case-text is the bug) |
+
+Empirically: AFS-drift bugs slip through file:line review because the file and the line both match the AFS — the AFS is the bug. Only triangulation catches it.
+
+### Standing reviewer checks
+
+- Assertion strength (no demoted expects, no missing `toBeEnabled` guards)
 - Selector stability (locator ladder per testing.md)
-- Defect masking (no test.fail, no xit, no weakened assertions)
-- POM discipline (no raw selectors in spec files)
+- Defect masking — bi-directional: no `test.fail`/`xit`/weakened assertions away from defects; no assertions held to stale case-text against live-correct product (§ Reverse-masking guard)
+- POM discipline (no raw selectors in spec files; additive-only on shared-caller files — § Hard Rules → 3)
 - Naming + dead code
-- AFS amendments — any selector drift between AFS and implementation must be reflected in an AFS docs commit
+- AFS amendments — any selector / observable drift between AFS and implementation must be reflected in an AFS docs commit in the same PR
+- Read-only-by-default check — if seed/cleanup logic shipped where the observable could have been asserted read-only on stable data, flag for refactor (§ Hard Rules → 10)
 
 Verdict: `APPROVED` | `CHANGES_REQUESTED` with file:line findings. Findings go back to implementer; TAL decides ship-vs-amend.
 
