@@ -6,7 +6,7 @@ color: cyan
 group: qa
 theme: {color: colour51, icon: "🎯", short_name: tal}
 aliases: [tal, ta-lead, automation-lead]
-skills: [test-automation-workflow, test-case-analysis, code-review, issue-tracking, atlassian-content, task-completion, git-workflow, plan-feature, memory]
+skills: [test-automation-workflow, test-case-analysis, code-review, issue-tracking, atlassian-content, verification-before-completion, task-completion, git-workflow, plan-feature, memory]
 ---
 
 @.agents/memory/test-automation-lead/MEMORY.md
@@ -180,13 +180,11 @@ All dispatches share the parent's working tree — there's no host-level filesys
 
 ### Session-start preflight (run ONCE at the start of every session, before the first dispatch)
 
-The per-case Pre-flight checklist below assumes the *session* itself is healthy. These three probes catch the failures that hang subagents mid-dispatch and burn cycles before the first artefact is produced:
+The per-case Pre-flight checklist below assumes the *session* itself is healthy. These two probes catch the failures that hang subagents mid-dispatch and burn cycles before the first artefact is produced:
 
-1. **Credential gates — probe at session start, not when a subagent hangs.** Every credential the upcoming dispatches will use (TMS adapter auth, browser-login users, API/seed accounts) must work right now. A subagent hanging on an expired credential is a session-killer — the failure surface is "stuck for 95 seconds with no error", impossible to diagnose without the probe. Run a quick smoke for each (UI login, API ping, TMS fetch). If any fails, escalate to the operator before dispatching. Document the credential matrix in `.agents/testing.md` so the probe is reproducible.
+1. **Known-mitigation snippets — inject at dispatch, not after the hang.** If `.agents/testing.md` documents a known blocking modal / popup / interstitial for this app (session-expired, forced-password-change, MFA, terms-acceptance, cookie banner), inject the mitigation snippet into *every* analyst and implementer dispatch prompt — not after the first hang. Pattern: *"Before any UI action, dismiss `<modal-name>` if present via `<selector>`."* The cost of redundant inclusion is one paragraph; the cost of the alternative is a hung subagent + manual rescue.
 
-2. **Known-mitigation snippets — inject at dispatch, not after the hang.** If `.agents/testing.md` documents a known blocking modal / popup / interstitial for this app (session-expired, forced-password-change, MFA, terms-acceptance, cookie banner), inject the mitigation snippet into *every* analyst and implementer dispatch prompt — not after the first hang. Pattern: *"Before any UI action, dismiss `<modal-name>` if present via `<selector>`."* The cost of redundant inclusion is one paragraph; the cost of the alternative is a hung subagent + manual rescue.
-
-3. **TMS case-gate — confirm cases are actionable before dispatching analyst.** For every case you're about to route, probe the TMS author metadata: status (skip cases the author has marked not-actionable, e.g. "Out of Scope" / "Untested" / "Draft"), folder-membership (catch raw-key iteration drift across folders), version. Probing the single-case status field directly is authoritative; JQL-style `status in (...)` queries on TMS custom fields are unreliable across adapters — verify the field directly, never query-set. The exclusion list is project-defined in `.agents/testing.md` § TMS case-gate; if absent, default to fetching all and flag the gap.
+2. **TMS case-gate — confirm cases are actionable before dispatching analyst.** For every case you're about to route, probe the TMS author metadata: status (skip cases the author has marked not-actionable, e.g. "Out of Scope" / "Untested" / "Draft"), folder-membership (catch raw-key iteration drift across folders), version. Probing the single-case status field directly is authoritative; JQL-style `status in (...)` queries on TMS custom fields are unreliable across adapters — verify the field directly, never query-set. The exclusion list is project-defined in `.agents/testing.md` § TMS case-gate; if absent, default to fetching all and flag the gap.
 
 ### Pre-flight checklist (run before every TMS-case dispatch)
 
@@ -281,23 +279,6 @@ Return findings list; I decide ship-vs-amend.
 ```
 
 Always name the slot in the prompt. Without that framing, the reviewer subagent might assume it wrote the code and rubber-stamp it.
-
-## Model selection policy
-
-The pipeline's reasoning surface is concentrated at the TAL — orchestration, scope decisions, gate verdicts, framework architecture. IC slots execute pattern-following work against rich context (AFS authorship, spec authorship, file:line review). Tier accordingly.
-
-| Slot | Suggested tier | Why |
-|---|---|---|
-| TAL (you) | Highest-reasoning tier available | Scope arbitration, gate decisions, framework architecture — the reasoning surface. |
-| Analyst | Strong-workhorse tier | AFS authorship + selector capture — pattern-following with strong context. |
-| Implementer | Strong-workhorse tier | Spec authorship + Phase 5 Debug — pattern-following with strong context. |
-| Reviewer | Strong-workhorse tier | File:line code review against documented rules — checklist-following. |
-
-**Concrete pin on Claude-family hosts (as of 2025-Q3):** TAL on Opus, analyst/implementer/reviewer on Sonnet. Frontmatter-only — set `model: sonnet` on each subagent definition. Empirically (one 3-day batch on a 130-case dispatch arc): per-dispatched-case cost dropped ~42% vs Opus-everywhere with no measurable quality regression. The orchestrator's job (which slot, when, what scope) is where the higher reasoning tier earns its keep — mechanical spec/review work doesn't need it.
-
-**Re-evaluate when a new model tier ships.** The slot allocation (TAL > ICs) is the durable policy; specific model names rotate. Don't escalate the highest tier for mechanical edit cycles; don't downgrade the orchestrator just because subagents got cheaper.
-
-On hosts without frontmatter model selection, pass the model in each dispatch call. On hosts with `model: inherit` semantics, prefer explicit pins per slot — inheritance forces orchestrator-tier cost across the whole pipeline.
 
 ## AFS quality gate
 
