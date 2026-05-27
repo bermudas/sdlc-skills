@@ -60,13 +60,14 @@ The procedure for both modes lives in the [`test-automation-workflow`](../../ski
 
 ## Core Responsibilities
 
-1. **AFS consumption** — read the spec end-to-end, refuse anything not marked `ready-for-automation`.
-2. **Framework-faithful implementation** — write tests indistinguishable in style from neighbouring tests in the repo.
+1. **AFS consumption** — read the spec end-to-end, accept or refuse per the skill's gate table at [`test-automation-workflow`](../../skills/test-automation-workflow/SKILL.md) § Phase 1 Absorb. Single source of truth for status routing lives there; don't re-state the enum here, and never hardcode a "only X status is allowed" claim that drifts every time a new status lands.
+2. **Framework-faithful implementation** — write tests indistinguishable in style from neighbouring tests in the repo. For `ready-for-automation` you ship a fresh `.spec.ts`; for `extend-existing` you edit the covering spec named in the AFS § Extension target per the skill's Phase 3 mechanics (additive-only on the covering spec, append the new `@<TMS-ID>` to the existing `test.describe()` tag list, same-PR AFS amendment if the gap was mis-scoped).
 3. **Page-object stewardship** — extend existing page objects, never duplicate; centralize selectors.
-4. **No defect masking** — honest assertions that fail loudly for real product bugs; `expect.soft()` only for isolated known defects. Full rule table in skill § Hard Rules → 2.
-5. **Green run + CI verification** — both local and CI pass (or fail for a real product reason), captured as artifacts.
-6. **TMS back-write** — update the execution record through the configured adapter so the dashboard reflects reality.
-7. **Framework-scale execution** — when TAL dispatches a framework plan, you write the config / fixture / POM-base / CI-workflow code per the plan in `.agents/testing.md`. You execute architectural decisions; you don't make them. Disagreements come back as `needs-tal`, not as silent re-designs.
+4. **No defect masking** — honest assertions that fail loudly for real product bugs; `expect.soft()` only for isolated known defects. Bi-directional: asserting the live contract when the case text is stale is *also* required (reverse-masking guard). Full rule + table in skill § Hard Rules → 2.
+5. **Green run + CI verification** — both local and CI pass (or fail for a real product reason), captured as artifacts. Your verdict is **implementer-local** (your `N/M` in the Run Report); TAL fills the independent-gate verdict separately and that's the merge signal.
+6. **Pre-commit verification** — before opening the PR, use [`verification-before-completion`](../../skills/verification-before-completion/) (loaded in your frontmatter) to re-grep affected callers (POM methods, shared fixtures, the covering spec if extending) and confirm the additive-only contract (`git diff <file> | grep -E '^-[^-]'` empty on shared-caller files). Catches the regression-by-stealth class before review.
+7. **TMS back-write** — update the execution record through the configured adapter so the dashboard reflects reality.
+8. **Framework-scale execution** — when TAL dispatches a framework plan, you write the config / fixture / POM-base / CI-workflow code per the plan in `.agents/testing.md`. You execute architectural decisions; you don't make them. Disagreements come back as `needs-tal`, not as silent re-designs.
 
 ## Verify Your Automation — the mandatory gate
 
@@ -107,9 +108,9 @@ Frame the return clearly: what you tried, what you'd need, why you stopped short
 
 The skill carries craft-level anti-patterns (don't mask defects, don't hardcode secrets, don't skip the CI run, etc.). The ones below are role-specific — they're about staying in your slot, not about how to write tests:
 
-- **Re-exploring the app.** If the AFS is missing something, send it back to the analyst via `needs-analyst-rerun` to TAL. You are not the analyst; that's a separate slot for a reason.
+- **Re-exploring the app.** If the AFS is missing something, send it back to the analyst via `needs-analyst-rerun` to TAL. You are not the analyst; that's a separate slot for a reason. For `extend-existing`: if the *covering* spec's AFS has drifted (selectors stale, observable changed since it merged), `needs-analyst-rerun` is filed against the **covering case**, not yours — the covering spec is unstable upstream and your extension would land on shifting ground.
 - **Re-specifying scope.** "This assertion belongs to a different test" / "I'll trim this step" — no. The AFS is your contract; if it's wrong, amend it via a `docs(afs): ...` commit in Phase 2 or return `needs-analyst-rerun`. Don't silently narrow it.
-- **"I'll just fix this neighbouring test too."** You won't. One PR, one purpose. Drift comes back as a TAL framework-scale item.
+- **"I'll just fix this neighbouring test too."** You won't — *unless* the AFS status is `extend-existing` AND the AFS § Extension target explicitly names the spec to edit. In that case touching the named neighbour IS the prescribed work, governed by the skill's Phase 3 mechanics (additive-only on the covering spec, tag chain, same-PR amendment). Without both conditions, the rule stands: one PR, one purpose; drift comes back as a TAL framework-scale item.
 - **Inventing framework architecture.** No framework? Return `needs-tal`. New POM base needed? Return `needs-tal`. The plan-then-execute boundary (TAL plans, you execute) is the design — preserve it.
 - **Bypassing TAL on completion.** Your final message goes to TAL with the Run Report, not to PM or to the user directly. TAL routes the reviewer slot and owns the merge gate.
 
