@@ -30,14 +30,35 @@ flags defects, and only then produces a spec.
 - **No skipping exploration.** Even if the TMS case looks complete,
   execute it. The case describes intent; only execution reveals truth.
 
-## The six-phase loop (one case at a time)
+## Phase 0 — Case-gate (preflight, runs BEFORE Phase 1)
+
+Before fetching the case body, probe its TMS author metadata. Skip cases the author has marked as not actionable — there's no analyst value in executing them, and downstream the implementer / TAL will reject them.
+
+**What to probe** (project-defined in `.agents/testing.md` § TMS case-gate; if absent, default to fetching all and flag the gap):
+
+| Metadata field | Typical exclusions | Why |
+|---|---|---|
+| **Status** | `Out of Scope`, `Untested`, `Draft`, `Deprecated` | Author has signalled the case isn't currently a target — don't burn cycles |
+| **Folder / parent membership** | Mismatch vs requested folder | Catches raw-key-ASC iteration drift across folders (e.g. `KEY-NNN` is in folder A, `KEY-NNN+1` jumped to folder B) — drift recurs when iterating by key |
+| **Version / last-modified** | Stale per the project's freshness threshold | Stale cases often contradict the live product (case-text drift) — see [`test-automation-workflow`](../test-automation-workflow/SKILL.md) § Reverse-masking guard |
+
+**How to probe.** Probe the *single-case status field* directly via your adapter (`get_field_value` / `fetch_case(id, fields=[status])` / equivalent). **Don't query-set** — JQL-style `status in (...)` queries on TMS custom fields are unreliable across adapters; verify the field on each case directly.
+
+**Outcomes:**
+
+- All probes clear → continue to Phase 1.
+- Status excluded → don't fetch the body; return `out-of-scope-by-author` with the field value as evidence; close the case in the tracker (or mark per project convention).
+- Folder/membership mismatch → don't dispatch; return to TAL with the discrepancy. Iteration drift is a TAL-side routing issue, not an analyst-side execution issue.
+- TMS unreachable for the probe → fall back to fetching the body (Phase 1 will surface it); flag the gap for scout to fill in `.agents/testing.md`.
+
+## The six-phase loop (one case at a time, runs AFTER Phase 0)
 
 ```
 1. Fetch the case         → TMS adapter (pluggable; see test-automation.yaml)
 2. Read app context       → .agents/architecture.md + previous AFS files
 3. Execute                → browser-driving capability (your agent's wired MCP), step-by-step
 4. Capture selectors      → stable, accessible, fallback-ready
-5. Classify findings      → ready / blocked / defect-found / un-automatable
+5. Classify findings      → ready / already-covered / blocked / defect-found / un-automatable
 6. Emit AFS               → test-specs/<feature>/l<pri>_<slug>_<tms-id>.md
 ```
 
@@ -109,6 +130,18 @@ Status per case (goes in the AFS metadata block):
 
 - **ready-for-automation** — case executed end-to-end, selectors
   captured, no blockers
+- **already-covered** — Rule-6 behavioural-equivalence dedup against
+  an existing merged spec. The observable this case asserts is
+  already proven by another spec on file. No own implementation
+  needed. Emit a *traceability AFS* at
+  `test-specs/<feature>/lcovered_<slug>_<tms-id>.md` containing the
+  **dedup proof**: covering spec at `file:line` + a one-paragraph
+  behavioural-equivalence argument (why the existing assertion
+  satisfies this case's expected observable). Link the original
+  TMS case to the covering one in the tracker so the audit trail
+  resolves both ways. The `lcovered_` filename prefix is the
+  contract — downstream audits grep for it to enumerate
+  Rule-6-dedup coverage distinct from fresh-implementation coverage.
 - **blocked** — analyst hit a wall (access, data, env); the AFS's
   "Blocked Steps" section lists what's needed to unblock
 - **defect-found** — real product bug prevents completion. File the
@@ -117,6 +150,17 @@ Status per case (goes in the AFS metadata block):
   reference the bug ID in the AFS
 - **un-automatable** — keep as manual; do not emit an AFS; update
   the TMS note
+
+> **Reverse-masking guard — case-text drift is a CLARIFICATION, not
+> a defect.** When the live product correctly diverges from the case
+> text (case says ≥44px, product = 40px and that's the design;
+> case says "Save button visible", product correctly removed Save),
+> the **case text** is what's stale, not the product. Don't classify
+> as `defect-found`; classify as `ready-for-automation` and assert
+> the live contract. File the case-text drift as a CLARIFICATION
+> per the project's `Bug filing style`, not a Bug. Full treatment
+> in [`test-automation-workflow`](../test-automation-workflow/SKILL.md)
+> § Reverse-masking guard.
 
 When you find a defect during execution:
 
@@ -265,6 +309,16 @@ When the AFS is ready:
   the selector table. Run the step.
 - **`test.fail()`-style thinking.** If a step fails for a real
   product reason, that's a defect, not a caveat in the AFS.
+- **Skipping Phase 0 (case-gate)** because the case "looked fine"
+  in a previous batch. Status / folder-membership / version drift
+  between batches — re-probe per case, every dispatch.
+- **Classifying case-text drift as `defect-found` instead of
+  CLARIFICATION.** If live product is correct and the case is
+  stale, the case is the bug, not the product. Asserting the
+  stale case-text is reverse-masking (see § Classify findings note).
+- **Re-implementing a case whose observable is already proven by
+  another merged spec.** Rule-6 dedup → `already-covered` with a
+  traceability AFS (`lcovered_*.md`), not a duplicate `.spec.ts`.
 
 ## References
 
