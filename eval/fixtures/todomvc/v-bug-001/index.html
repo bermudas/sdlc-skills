@@ -1,0 +1,33 @@
+<!doctype html>
+<!-- Fixture: minimal TodoMVC — v-bug-001. SEEDED BUG: completing a todo does NOT
+     mark the item completed (the `completed` class is never added). A correct test
+     for "complete a todo" must PASS on v-clean and FAIL here. -->
+<html lang="en">
+<head><meta charset="utf-8" /><title>TodoMVC (bug-001)</title></head>
+<body>
+  <h1>todos</h1>
+  <input data-testid="new-todo" placeholder="What needs to be done?" />
+  <ul data-testid="todo-list"></ul>
+  <script>
+    const input = document.querySelector('[data-testid="new-todo"]');
+    const list = document.querySelector('[data-testid="todo-list"]');
+    input.addEventListener("keydown", (e) => {
+      if (e.key !== "Enter" || !input.value.trim()) return;
+      const li = document.createElement("li");
+      li.dataset.testid = "todo-item";
+      const cb = document.createElement("input");
+      cb.type = "checkbox";
+      cb.dataset.testid = "toggle";
+      const label = document.createElement("span");
+      label.textContent = input.value.trim();
+      cb.addEventListener("change", () => {
+        // BUG: the completed class is never toggled — item stays "active".
+        /* li.classList.toggle("completed", cb.checked); */
+      });
+      li.append(cb, label);
+      list.append(li);
+      input.value = "";
+    });
+  </script>
+</body>
+</html>

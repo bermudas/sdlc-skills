@@ -1,0 +1,15 @@
+{
+  "task": "scout-seeding",
+  "description": "Grade the artifacts scout produced when seeding a project (the .agents/* docs + CLAUDE.md/AGENTS.md). One reviewable list — edit/extend freely.",
+  "scale": "0-3",
+  "passThreshold": 0.7,
+  "criteria": [
+    { "id": "framework", "weight": 3, "question": "Do the seeded docs correctly identify the test framework AND the exact command to run tests?" },
+    { "id": "pkg-manager", "weight": 1, "question": "Is the package manager identified correctly (matches the repo)?" },
+    { "id": "app-knowledge", "weight": 2, "question": "Do the docs describe the app under test — structure, key surfaces, and locator/testid conventions?" },
+    { "id": "way-of-work", "weight": 1, "question": "Is a (light) way-of-work / team workflow captured?" },
+    { "id": "role-briefings", "weight": 2, "question": "Are per-role memory briefings present and relevant to each role's job?" },
+    { "id": "no-fabrication", "weight": 3, "question": "Are the facts accurate — no fabricated or contradictory claims (e.g. wrong package manager, a framework that isn't there)?" },
+    { "id": "actionable", "weight": 2, "question": "Could a downstream agent start work using ONLY these docs (commands, paths, conventions are concrete, not vague)?" }
+  ]
+}

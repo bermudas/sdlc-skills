@@ -1,0 +1,23 @@
+{
+  "name": "sdlc-skills-eval",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Dev-only evaluation harness for sdlc-skills agents/bundles. NOT installed into consumers (bin/init.mjs only scans agents//skills//bundles/). The stdlib spine + Layer-0 tests run with zero deps under `node --test`; only the live-agent driver needs the deps below.",
+  "scripts": {
+    "test": "node --test \"**/*.test.mjs\"",
+    "layer0": "node runner.mjs --layer 0 --bundle test-automation",
+    "spine": "node runner.mjs --layer spine",
+    "scout": "node runner.mjs --layer scout",
+    "e2e": "node runner.mjs --layer 2",
+    "e2e:acp": "node runner.mjs --layer acp"
+  },
+  "dependencies": {
+    "@agentclientprotocol/claude-agent-acp": "^0.42.0",
+    "@agentclientprotocol/sdk": "^0.25.0",
+    "@anthropic-ai/claude-agent-sdk": "latest"
+  },
+  "optionalDependencies": {
+    "playwright": "latest"
+  }
+}

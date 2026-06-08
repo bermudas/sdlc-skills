@@ -1,0 +1,24 @@
+{
+  "id": "scout-seeding",
+  "skill": "seeding-a-project",
+  "description": "Artifacts scout (Kit) generates when seeding a project, and which hook injects each downstream. The seeding scorer (eval/spine/seeding.mjs) checks (1) the artifacts exist + are structured, (2) their content recalls ground-truth facts about the fixture, and (3) the hooks actually inject them. Sources: skills/seeding-a-project/SKILL.md, hooks/session-start, hooks/agent-start.",
+  "artifacts": [
+    { "path": "CLAUDE.md", "required": true, "injectedBy": "claude-native-import", "note": "auto-loaded by Claude Code" },
+    { "path": "AGENTS.md", "required": true, "injectedBy": "read-on-demand", "note": "full team reference; read, not injected" },
+    { "path": ".agents/profile.md", "required": true, "injectedBy": ["session-start", "agent-start"] },
+    { "path": ".agents/workflow.md", "required": true, "injectedBy": ["session-start", "agent-start"] },
+    { "path": ".agents/testing.md", "required": true, "injectedBy": ["session-start", "agent-start"], "note": "primary reference for QA/test-automation roles" },
+    { "path": ".agents/team-comms.md", "required": true, "injectedBy": ["session-start", "agent-start"] },
+    { "path": ".agents/conventions.md", "required": false, "injectedBy": ["session-start"] },
+    { "path": ".agents/architecture.md", "required": false, "injectedBy": "read-on-demand" },
+    { "path": ".agents/onboarding.md", "required": false, "injectedBy": "none", "note": "scout's own audit trail" },
+    { "path": ".agents/memory/<role>/MEMORY.md", "perRole": true, "required": true, "injectedBy": ["agent-start"] },
+    { "path": ".agents/memory/<role>/project_briefing.md", "perRole": true, "required": true, "injectedBy": ["agent-start"], "note": "per-role briefing; rides in the memory digest" }
+  ],
+  "injection": {
+    "session-start": { "fires": ["startup", "clear", "compact", "resume"], "injects": [".agents/profile.md", ".agents/workflow.md", ".agents/testing.md", ".agents/team-comms.md", ".agents/conventions.md"], "unseeded": "injects nothing (exits quietly)" },
+    "agent-start": { "fires": ["per-subagent-dispatch"], "injects": ["role memory (snapshot.md / MEMORY.md)", ".agents/profile.md", ".agents/workflow.md", ".agents/testing.md", ".agents/team-comms.md", ".agents/role-overrides.md"] },
+    "requiredInjectedShared": [".agents/profile.md", ".agents/workflow.md", ".agents/testing.md", ".agents/team-comms.md"]
+  },
+  "groundTruthFacts": "Per-fixture facts a correct seeding must capture live in fixtures/<id>/facts/facts.json (test command, framework + version, package manager, base branch, build command, key conventions). Getting one WRONG (e.g. npm when the repo uses pnpm) is worse than missing it — downstream agents act on it."
+}

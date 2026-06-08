@@ -1,0 +1,25 @@
+# fixtures/todomvc/fault-manifest.yaml — the answer key for this fixture.
+fixture: todomvc
+base: v-clean
+builds:
+  - v-clean        # correct
+  - v-bug-001      # one seeded fault
+faults:
+  - id: F-001
+    build: v-bug-001
+    dimension: functional
+    severity: high
+    location: "todo toggle handler"
+    repro: "Add a todo, tick its checkbox → the item is NOT marked completed (no `completed` class)."
+    oracle:
+      type: dom-assert
+      selector: '[data-testid="todo-item"]'
+      after: 'check [data-testid="toggle"]'
+      expect_clean: 'has class "completed"'
+      expect_buggy: 'does NOT have class "completed"'
+    # SWT-bench dual-run contract for the generated test:
+    swt:
+      passes_on: [v-clean]
+      fails_on: [v-bug-001]
+    match_keywords: ["complete", "completed", "toggle", "checkbox"]
+expected_clean_findings: 0   # precision oracle: v-clean has no true faults

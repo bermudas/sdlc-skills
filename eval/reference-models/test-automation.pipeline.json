@@ -1,0 +1,33 @@
+{
+  "id": "test-automation",
+  "orchestrator": "test-automation-lead",
+  "description": "Intended pipeline + invariants for the test-automation bundle (Tal). The conformance scorer (eval/spine/conformance.mjs) scores a captured trajectory against this model. Sources: agents/test-automation-lead/AGENT.md, bundles/test-automation/instructions.md, skills/test-automation-workflow/references/orchestration-playbook.md.",
+  "stages": [
+    { "id": "scout-gate", "optional": true, "desc": "If project unseeded (.agents/* absent), pause for scout — do not dispatch blind." },
+    { "id": "analyst", "dispatch": "qa-engineer", "produces": "afs", "desc": "Analyst writes the Automation-Friendly Spec + a status." },
+    { "id": "afs-gate", "gate": true, "desc": "Only ready-for-automation / extend-existing advances to the implementer." },
+    { "id": "implementer", "dispatch": "test-automation-engineer", "produces": "pr+runreport", "desc": "Manual-run-before-automate, then automate; returns PR + Run Report." },
+    { "id": "reviewer", "dispatch": "qa-engineer", "freshSession": true, "produces": "verdict", "desc": "Adversarial test-honesty review in a FRESH session." },
+    { "id": "live-run-gate", "gate": true, "desc": "Tal's own gate: N consecutive green live-runs in Tal's session before merge." },
+    { "id": "merge", "desc": "Merge + file follow-ups + back-write TMS + close tracker." }
+  ],
+  "allowedLoops": [
+    ["reviewer", "implementer"],
+    ["implementer", "analyst"]
+  ],
+  "hardGates": ["afs-gate", "reviewer-approved", "live-run-gate"],
+  "criticalInvariants": ["no-masking", "tal-no-forbidden-edits"],
+  "liveRunGreenRequired": 3,
+  "r2Cap": 2,
+  "forbiddenOrchestratorPaths": [
+    "tests/", "test/", "spec/", "e2e/",
+    "pages/", "page_objects/", "fixtures/", "helpers/", "support/",
+    "playwright.config", "cypress.config", "wdio.conf", "jest.config",
+    "pytest.ini", "conftest.py",
+    "package.json", "tsconfig", "pyproject.toml", "pom.xml", ".csproj",
+    ".env"
+  ],
+  "allowedOrchestratorPaths": [".agents/memory/test-automation-lead/", ".agents/audit/", ".agents/testing.md", ".agents/test-automation.yaml"],
+  "maskingPatterns": ["test.fail(", "xit(", "fit(", ".skip(", "@Ignore", "pytest.skip", "Skip()", "test.only", "expect(true).toBe(true)"],
+  "advancingAfsStatuses": ["ready-for-automation", "extend-existing"]
+}

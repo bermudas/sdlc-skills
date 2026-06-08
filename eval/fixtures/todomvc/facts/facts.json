@@ -1,0 +1,11 @@
+{
+  "fixture": "todomvc",
+  "comment": "Ground-truth facts a correct scout seeding must capture about this fixture. Used by spine/seeding.mjs scoreFactRecall. A WRONG value (dangerousIfWrong) misleads downstream agents and makes the seeding unusable.",
+  "facts": [
+    { "key": "packageManager", "value": "npm", "wrongValues": ["pnpm", "yarn", "bun"], "dangerousIfWrong": true },
+    { "key": "testCmd", "value": "npx playwright test", "dangerousIfWrong": true },
+    { "key": "framework", "value": "Playwright" },
+    { "key": "baseBranch", "value": "main" },
+    { "key": "entrypoint", "value": "index.html" }
+  ]
+}
