@@ -10,6 +10,7 @@ import assert from "node:assert/strict";
 import { readFileSync, existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
+import { lintTestCode } from "../../spine/lint.mjs";
 
 const REPO = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
 const read = (rel) => readFileSync(join(REPO, rel), "utf8");
@@ -17,6 +18,14 @@ const readJSON = (rel) => JSON.parse(read(rel));
 
 const bundle = readJSON("bundles/test-automation/bundle.json");
 const model = readJSON("eval/reference-models/test-automation.pipeline.json");
+
+// The reference model names the test-automation-workflow skill as a source (see
+// model.description), and the bundle SHIPS that skill (it's a localSkill). So the
+// skill's load-bearing rules are part of the bundle's eval contract — guard them
+// here so editing the skill can't silently drift from what the model + lint score.
+const skillSrc =
+  read("skills/test-automation-workflow/SKILL.md") + "\n" +
+  read("skills/test-automation-workflow/references/orchestration-playbook.md");
 
 // skills.json registry — to resolve localSkills the way the installer does
 const registryRaw = existsSync(join(REPO, "skills.json")) ? readJSON("skills.json") : {};
@@ -84,4 +93,47 @@ test("reference model is internally consistent + matches source invariants", () 
   // the forbidden config paths the model scores against must actually appear in Tal's source rules
   const lead = read("agents/test-automation-lead/AGENT.md");
   assert.ok(lead.includes("playwright.config"), "model/source drift: playwright.config");
+});
+
+// --- model ↔ shipped-skill drift guards -----------------------------------
+// The model cites skills/test-automation-workflow as a source but nothing checked
+// the skill still carries those invariants. Close that gap (still a bundle test:
+// the bundle ships this skill).
+
+test("the shipped skill still carries the AFS status contract the model advances on", () => {
+  for (const status of model.advancingAfsStatuses) {
+    assert.ok(skillSrc.includes(status), `skill lost the advancing AFS status: ${status}`);
+  }
+  // the non-advancing statuses the implementer/orchestrator slots gate on
+  for (const status of ["blocked", "already-covered", "un-automatable", "defect-found"]) {
+    assert.ok(skillSrc.includes(status), `skill lost the AFS refusal status: ${status}`);
+  }
+});
+
+test("the shipped skill still encodes the No-Defect-Masking forbidden tokens", () => {
+  assert.match(skillSrc, /No [Dd]efect [Mm]asking/, "skill lost the No-Defect-Masking rule heading");
+  for (const tok of ["test.fail(", "xit(", "@Ignore", "pytest.skip"]) {
+    assert.ok(skillSrc.includes(tok), `skill no longer forbids the masking token: ${tok}`);
+  }
+});
+
+test("the shipped skill still encodes the locator ladder (role before testid)", () => {
+  const role = skillSrc.indexOf("getByRole");
+  const testid = skillSrc.indexOf("getByTestId");
+  assert.ok(role !== -1 && testid !== -1, "locator-ladder tiers missing from the skill");
+  assert.ok(role < testid, "locator-ladder order broke: getByRole must precede getByTestId");
+});
+
+test("the shipped skill still encodes the manual-before-automate philosophy + the R2 cap", () => {
+  assert.match(skillSrc, /do not automate what you have not executed/i, "skill lost the manual-before-automate core philosophy");
+  assert.match(skillSrc, /R2 cap|≤\s*2 reruns|2 reruns/i, `skill lost the R2 cap (model.r2Cap=${model.r2Cap})`);
+});
+
+// --- model ↔ lint detector parity -----------------------------------------
+// Every masking construct the model declares forbidden must actually fire the
+// deterministic lint detector — else a forbidden pattern slips through scoring.
+test("every model masking pattern is caught by the lint detector (contract ↔ detector parity)", () => {
+  for (const p of model.maskingPatterns) {
+    assert.ok(lintTestCode(p).maskingHits >= 1, `lint.mjs does not flag a model-declared masking pattern: ${JSON.stringify(p)}`);
+  }
 });
