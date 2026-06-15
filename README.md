@@ -136,6 +136,7 @@ npx github:arozumenko/sdlc-skills init --bundle team-web   # JS/TS frontend + Py
 npx github:arozumenko/sdlc-skills init --bundle team-ios   # Swift / SwiftUI
 npx github:arozumenko/sdlc-skills init --bundle web-qa     # manual-QA team (live browser testing via Playwright MCP)
 npx github:arozumenko/sdlc-skills init --bundle test-automation  # TMS-driven automation pipeline (analyst → implementer → reviewer, led by Tal)
+npx github:arozumenko/sdlc-skills init --bundle quality-engineering  # in-sprint testing — triage → curate → author → review → execute → report → triangulate (one seat per stage)
 
 # Full catalog, all detected IDEs
 npx github:arozumenko/sdlc-skills init --all
@@ -158,7 +159,7 @@ npx github:arozumenko/sdlc-skills init --all --update
 set of agents (with their skills), seeds per-role stack briefings into
 `.agents/memory/<role>/`, splices team conventions into `AGENTS.md` /
 `CLAUDE.md`, applies per-role **skill overlays**, and can **seed reference
-files** into the project — one command instead of hand-listing roles. Four
+files** into the project — one command instead of hand-listing roles. Five
 ship today:
 
 | Bundle | Roster | What it's for |
@@ -167,6 +168,7 @@ ship today:
 | `team-ios` | shared core + ios-dev + QA | Swift / SwiftUI delivery team |
 | `web-qa` | 6 bundle-local agents (app-profiler, test-sizer, test-author, test-run-lead, test-runner, test-reporter) | Manual-QA team — `app-profiler` onboards the app, then `test-run-lead` orchestrates a run: authoring (`test-author`) and sizing (`test-sizer`) cases when needed, running them live via Playwright MCP (`test-runner`), and reporting (`test-reporter`). Ships its own agents and seeds the test-case/report-format reference docs into `.agents/web-qa/knowledge/`. |
 | `test-automation` | shared core (scout) + test-automation-engineer + qa-engineer + bundle-local `test-automation-lead` (Tal) | Automation-focused team — Tal orchestrates the analyst → implementer → reviewer pipeline, owns test-framework architecture and the automation merge gate. Pins `test-automation-workflow` + `test-case-analysis`; TMS-agnostic. |
+| `quality-engineering` | scout + 6 bundle-local seats (`qe-lead`, `story-analyst`, `case-curator`, `test-author`, `test-runner`, `test-reporter` — reporter on haiku) | **In-sprint testing** with structural separation of duties — the lead orchestrates triage → **reuse-first case curation** (keep/update/rewrite/retire + regression scope, via `case-curation`) → author → cold review → execution (build-stamped evidence) → reporting → **bugfix verification** → **5-axis triangulation** (tested↔cases↔requirements↔functionality↔intent), one isolated seat per stage. No framework automation. Distinct from `web-qa` (in-sprint discipline + curation + triangulation vs pure run-execution). |
 
 See [`bundles/SPEC.md`](bundles/SPEC.md) and each bundle's `README.md` to
 author your own.
@@ -279,7 +281,7 @@ frameworks, other IDEs) can point directly at `skills/<name>/`.
 
 ## Catalog
 
-### Agents (10)
+### Agents (11)
 
 | Agent | Persona | Role |
 |---|---|---|
@@ -291,6 +293,7 @@ frameworks, other IDEs) can point directly at `skills/<name>/`.
 | `ios-dev` | Io | iOS/Swift implementation — SwiftUI, SwiftData, Swift Testing (no simulator) |
 | `qa-engineer` | Sage | Tests PRs, reports findings, executes TMS cases and emits Automation-Friendly Specs via the `test-case-analysis` skill |
 | `test-automation-engineer` | Axel | Implements automation from AFS specs in the project's existing framework (Playwright / Cypress / pytest / JUnit / NUnit / WDIO) |
+| `qa-analyst` | Quinn | Audits a running product across dimensions (a11y / security / privacy / performance / responsive / content-SEO / UX), runs persona review, and owns the quality bar; PM-dispatched shift-left gate |
 | `scout` | Kit | Maps unfamiliar codebases — explores, documents patterns, flags risks |
 | `personal-assistant` | Octo | Conversational assistant: vault, email, calendar, daily brief |
 
@@ -330,6 +333,22 @@ frameworks, other IDEs) can point directly at `skills/<name>/`.
 | `obsidian-vault` | Read / write the user's Obsidian second brain |
 | `microsoft-365` | Microsoft Graph (email / calendar / Teams) integration |
 | `xlsx-reader` | Read `.xlsx` spreadsheets (test cases, checklists, requirement matrices) into Markdown for agent ingestion. Mirrored into the `web-qa` bundle as its primary consumer |
+
+**Quality (11):** — the audit family is the `qa-analyst` (Quinn) toolkit (the dimensional leaves are agent-orchestrated, routed by `quality-audit-workflow`); `requirement-traceability` and `case-curation` anchor the `quality-engineering` bundle (its `story-analyst` / `case-curator` seats); `test-generation` serves both
+
+| Skill | What it does |
+|---|---|
+| `quality-audit-workflow` | Multi-dimension quality-audit orchestration — modes, p0–p3 finding schema, specialist routing, persona review, reporting. Preloaded by `qa-analyst` |
+| `accessibility-audit` | Accessibility & WCAG 2.1 AA/AAA — axe-core + visual review (contrast, ARIA, keyboard, focus) |
+| `security-audit` | Web security — XSS, CSRF, headers (CSP / HSTS), mixed content, exposed secrets, OWASP Top 10 |
+| `privacy-audit` | Privacy & GDPR — cookies, trackers, storage, consent banners |
+| `performance-audit` | Performance — Core Web Vitals, network waterfall, console errors, JS issues |
+| `responsive-audit` | Responsive / mobile-web — touch targets, viewport, overflow, breakpoints (CDP emulation) |
+| `content-seo-audit` | Content & SEO — copy quality, meta tags, structured data, headings, links |
+| `ux-audit` | UI/UX & page types — forms, error messaging, 20+ page-type patterns |
+| `test-generation` | Coverage-gap proposal — candidate scenarios from a live page / findings (hands off to AFS, never framework tests) |
+| `requirement-traceability` | Story triage (testability → gaps & questions) + 5-axis triangulation: coverage (uncovered / orphan / stale / weak-evidence) plus spec-deviation and intent-gap validation. Anchors the `quality-engineering` bundle |
+| `case-curation` | Assess the existing case base against a story — match cases to ACs, classify keep / update / rewrite / retire / missing, surface case-vs-story contradictions, emit a minimal authoring delta + a regression scope. Reuse before you write |
 
 ### External skills (fetched by the installer)
 

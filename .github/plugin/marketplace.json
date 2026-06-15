@@ -12,6 +12,12 @@
       "version": "0.2.0"
     },
     {
+      "name": "accessibility-audit",
+      "source": "./skills/accessibility-audit",
+      "description": "Accessibility & WCAG 2.1 AA/AAA audit — axe-core + visual review (contrast, ARIA, keyboard, focus)",
+      "version": "0.2.0"
+    },
+    {
       "name": "atlassian-content",
       "source": "./skills/atlassian-content",
       "description": "Create well-formatted Jira issues/comments (ADF, API v3) and Confluence pages (storage format) with accountId-backed mentions and mandatory post-creation re-fetch + repair",
@@ -30,6 +36,12 @@
       "version": "0.2.0"
     },
     {
+      "name": "case-curation",
+      "source": "./skills/case-curation",
+      "description": "Assess an existing test-case base against a story — match cases to ACs, classify keep/update/rewrite/retire/missing, surface contradictions, emit a minimal authoring delta + regression scope",
+      "version": "0.2.0"
+    },
+    {
       "name": "code-review",
       "source": "./skills/code-review",
       "description": "Structured code review — security, quality, conventions",
@@ -39,6 +51,12 @@
       "name": "completing-a-task",
       "source": "./skills/completing-a-task",
       "description": "Five-step task completion protocol: verify locally → commit on feature branch → push & open PR → comment on tracker issue → notify the orchestrator. Used by devs at handoff",
+      "version": "0.2.0"
+    },
+    {
+      "name": "content-seo-audit",
+      "source": "./skills/content-seo-audit",
+      "description": "Content & SEO audit — copy quality, meta tags, structured data, headings, links",
       "version": "0.2.0"
     },
     {
@@ -90,6 +108,12 @@
       "version": "0.2.0"
     },
     {
+      "name": "performance-audit",
+      "source": "./skills/performance-audit",
+      "description": "Performance audit — Core Web Vitals, network waterfall, console errors, JS issues",
+      "version": "0.2.0"
+    },
+    {
       "name": "plan-feature",
       "source": "./skills/plan-feature",
       "description": "Structured feature planning — requirements, feasibility, acceptance criteria",
@@ -102,15 +126,51 @@
       "version": "0.2.0"
     },
     {
+      "name": "privacy-audit",
+      "source": "./skills/privacy-audit",
+      "description": "Privacy & GDPR audit — cookies, trackers, storage, consent banners",
+      "version": "0.2.0"
+    },
+    {
+      "name": "quality-audit-workflow",
+      "source": "./skills/quality-audit-workflow",
+      "description": "Multi-dimension quality-audit orchestration — modes, p0-p3 finding schema, specialist routing, persona review, reporting",
+      "version": "0.2.0"
+    },
+    {
+      "name": "quality-onboarding",
+      "source": "./skills/quality-onboarding",
+      "description": "Standalone qa-analyst self-onboarding (no scout) — interview, ingest codebase/docs/specs, synthesize a product quality profile into .agents/quality.md",
+      "version": "0.2.0"
+    },
+    {
       "name": "reproducing-issues",
       "source": "./skills/reproducing-issues",
       "description": "Reproduce a vague bug report into precise repeatable steps + evidence, ending in a CONFIRMED/CANNOT-REPRODUCE verdict (reproduction only)",
       "version": "0.2.0"
     },
     {
+      "name": "requirement-traceability",
+      "source": "./skills/requirement-traceability",
+      "description": "Requirement↔case↔result triangulation + story triage — coverage matrix, gaps-and-questions report, uncovered/orphan/stale/weak-evidence findings",
+      "version": "0.2.0"
+    },
+    {
+      "name": "responsive-audit",
+      "source": "./skills/responsive-audit",
+      "description": "Responsive / mobile-web audit — touch targets, viewport, overflow, breakpoints (CDP emulation)",
+      "version": "0.2.0"
+    },
+    {
       "name": "root-cause-analysis",
       "source": "./skills/root-cause-analysis",
       "description": "Trace a confirmed bug to its exact cause — execution path, classification, confidence, impact analysis (investigation only)",
+      "version": "0.2.0"
+    },
+    {
+      "name": "security-audit",
+      "source": "./skills/security-audit",
+      "description": "Web security audit — XSS, CSRF, headers (CSP/HSTS), mixed content, exposed secrets, OWASP Top 10",
       "version": "0.2.0"
     },
     {
@@ -138,9 +198,21 @@
       "version": "0.2.0"
     },
     {
+      "name": "test-generation",
+      "source": "./skills/test-generation",
+      "description": "Coverage-gap proposal — candidate test scenarios from a live page / audit findings (hands off to AFS)",
+      "version": "0.2.0"
+    },
+    {
       "name": "tosca-automation",
       "source": "./skills/tosca-automation",
       "description": "Tricentis TOSCA Cloud full lifecycle — create/update/run TestCases, Modules (Html + SapEngine), Reusable Blocks, Playlists, Inventory folders, TSU import/export. Bundled `tosca_cli.py` (httpx + typer + rich)",
+      "version": "0.2.0"
+    },
+    {
+      "name": "ux-audit",
+      "source": "./skills/ux-audit",
+      "description": "UI/UX & page-type audit — forms, error messaging, 20+ page-type patterns",
       "version": "0.2.0"
     },
     {

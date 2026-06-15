@@ -1,0 +1,15 @@
+{
+  "id": "quality-engineering",
+  "title": "Quality Engineering",
+  "description": "In-sprint testing team with structural separation of duties — qe-lead orchestrates story-analyst (triage/review/triangulation), case-curator (reuse-first case assessment + regression scope), test-author, test-runner (execute + fix-verify), and test-reporter as isolated single-purpose seats.",
+  "agents": [],
+  "skills": [],
+  "localAgents": ["scout", "qe-lead", "story-analyst", "case-curator", "test-author", "test-runner", "test-reporter"],
+  "localSkills": ["atlassian-content", "browser-verify", "case-curation", "issue-tracking", "memory", "playwright-testing", "reproducing-issues", "requirement-traceability", "seeding-a-project", "session-retrospective", "test-generation", "verifying-outcomes", "xlsx-reader"],
+  "briefings": {
+    "scout": "briefings/scout.md"
+  },
+  "seed": { "knowledge": ".agents/quality-engineering/knowledge" },
+  "instructions": "instructions.md",
+  "targets": ["claude"]
+}

@@ -20,6 +20,14 @@ the only source of truth. This skill never trusts the case as
 authored — it runs it step by step, captures stable selectors,
 flags defects, and only then produces a spec.
 
+> **Manual-track override.** On a team whose project briefing scopes
+> automation/AFS **out**, the
+> execute-and-observe machinery here still applies in full — but **stop
+> after § Classify: do not emit an AFS.** Your deliverable is the
+> executed, evidence-backed case (per the team's case format), with the
+> classification and any defects filed. The briefing wins over the emit
+> phase below.
+
 ## Absolute boundaries
 
 - **No automation code.** No `.spec.ts`, no `test_*.py`, no step
@@ -92,7 +100,7 @@ Before fetching the case body, probe its TMS author metadata. Skip cases the aut
 |---|---|---|
 | **Status** | `Out of Scope`, `Untested`, `Draft`, `Deprecated` | Author has signalled the case isn't currently a target — don't burn cycles |
 | **Folder / parent membership** | Mismatch vs requested folder | Catches raw-key-ASC iteration drift across folders (e.g. `KEY-NNN` is in folder A, `KEY-NNN+1` jumped to folder B) — drift recurs when iterating by key |
-| **Version / last-modified** | Stale per the project's freshness threshold | Stale cases often contradict the live product (case-text drift) — see [`test-automation-workflow`](../test-automation-workflow/SKILL.md) § Reverse-masking guard |
+| **Version / last-modified** | Stale per the project's freshness threshold | Stale cases often contradict the live product (case-text drift) — see `test-automation-workflow` § Reverse-masking guard when that skill is installed; the short rule is in § Defects below |
 
 **How to probe.** Probe the *single-case status field* directly via your adapter (`get_field_value` / `fetch_case(id, fields=[status])` / equivalent). **Don't query-set** — JQL-style `status in (...)` queries on TMS custom fields are unreliable across adapters; verify the field on each case directly.
 
@@ -137,8 +145,9 @@ linked story, attachments.
 ### 3. Execute
 
 Three browser tools sit at different layers; pick by what's wired and
-what challenge you're solving. Full triage:
-[`../test-automation-workflow/references/browser-tools.md`](../test-automation-workflow/references/browser-tools.md).
+what challenge you're solving. (A fuller triage table ships with the
+automation track in `test-automation-workflow/references/browser-tools.md` —
+read it when that skill is installed; the summary below is self-sufficient.)
 In short:
 
 - **Default** — [`playwright-testing`](../playwright-testing/)
@@ -230,9 +239,9 @@ Status per case (goes in the AFS metadata block):
 > the **case text** is what's stale, not the product. Don't classify
 > as `defect-found`; classify as `ready-for-automation` and assert
 > the live contract. File the case-text drift as a CLARIFICATION
-> per the project's `Bug filing style`, not a Bug. Full treatment
-> in [`test-automation-workflow`](../test-automation-workflow/SKILL.md)
-> § Reverse-masking guard.
+> per the project's `Bug filing style`, not a Bug. (Full treatment in
+> `test-automation-workflow` § Reverse-masking guard, when that skill
+> is installed — the rule above is the complete short form.)
 
 When you find a defect during execution:
 

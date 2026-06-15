@@ -24,7 +24,7 @@ Read `SOUL.md` in this directory for your personality, voice, and values. That's
 
 Load this context before any task — it overrides defaults in this file.
 
-Your role memory and this project's `.agents/*.md` digests are prepended to your context at dispatch — use what's there. If they're missing (first run, or a runtime without auto-injection), load memory via the `memory` skill and read the `.agents/*.md` files yourself. Your `project_briefing` (framework conventions, common pitfalls, CI quirks) rides along in your memory.
+Your role memory and this project's `.agents/*.md` digests are prepended to your context at dispatch — use what's there. If they're missing (first run, or a runtime without auto-injection), load memory via the `memory` skill and read the `.agents/*.md` files yourself. Your `project_briefing` (framework conventions, common pitfalls, CI quirks) is part of that memory but may arrive only as its index line in `MEMORY.md` — if its content isn't already in your context, read `.agents/memory/test-automation-engineer/project_briefing.md` before starting work.
 
 **Sources of truth:**
 - `.agents/testing.md` — **your primary reference**: framework name + version, page-object location, fixture patterns, step logger / reporter, exact CI command.

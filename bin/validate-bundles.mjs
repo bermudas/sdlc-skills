@@ -12,6 +12,11 @@
 //   - `hooks` (if set) points at a file that parses as JSON
 //   - every `localAgents` entry has agents/<name>/AGENT.md in the bundle dir
 //   - every `localSkills` entry has skills/<name>/SKILL.md in the bundle dir
+// Also validates the hand-curated .claude-plugin/marketplace.json: every
+// plugin `source` path must exist and contain an AGENT.md or SKILL.md (the
+// generated marketplaces are covered by gen-marketplaces --check; this one
+// has no generator, so a renamed agent/skill dir would otherwise ship a
+// dangling entry silently).
 // Exits non-zero with a per-error report when anything fails.
 
 import { existsSync, readdirSync, readFileSync, statSync } from "fs";
@@ -57,6 +62,39 @@ function loadSkillIds() {
     }
   }
   return ids;
+}
+
+// The Claude Code marketplace is hand-curated (gen-marketplaces leaves it
+// alone), so nothing else catches a `source` path going stale after a rename.
+function validateClaudeMarketplace(err) {
+  const mpPath = join(PKG_ROOT, ".claude-plugin", "marketplace.json");
+  if (!existsSync(mpPath)) return;
+  let mp;
+  try {
+    mp = JSON.parse(readFileSync(mpPath, "utf8"));
+  } catch (e) {
+    err(".claude-plugin", `marketplace.json failed to parse: ${e.message}`);
+    return;
+  }
+  let bad = 0;
+  for (const p of mp.plugins || []) {
+    const src = typeof p.source === "string" ? p.source : null;
+    if (!src) continue; // non-path sources (objects/registries) are out of scope
+    const dir = join(PKG_ROOT, src);
+    if (!existsSync(dir)) {
+      err(".claude-plugin", `"${p.name}" source missing: ${src}`);
+      bad++;
+    } else if (
+      !existsSync(join(dir, "AGENT.md")) &&
+      !existsSync(join(dir, "SKILL.md")) &&
+      !existsSync(join(dir, ".claude-plugin", "plugin.json")) // plugin root (e.g. "./")
+    ) {
+      err(".claude-plugin", `"${p.name}" source has no AGENT.md/SKILL.md: ${src}`);
+      bad++;
+    }
+  }
+  if (bad === 0)
+    console.log(`  ✓ .claude-plugin/marketplace.json (${(mp.plugins || []).length} entries, sources resolve)`);
 }
 
 function main() {
@@ -179,6 +217,8 @@ function main() {
       console.log(`  ✓ ${id} (${n} agents)`);
     }
   }
+
+  validateClaudeMarketplace(err);
 
   if (errorCount > 0) {
     console.error(`\n${errorCount} error(s) across ${bundleDirs.length} bundle(s).`);

@@ -23,7 +23,7 @@ Read `SOUL.md` in this directory for your personality, voice, and values. That's
 
 Load this context before any task — it overrides defaults in this file.
 
-Your role memory and this project's `.agents/*.md` digests are prepended to your context at dispatch — use what's there. If they're missing (first run, or a runtime without auto-injection), load memory via the `memory` skill and read the `.agents/*.md` files yourself. Your `project_briefing` (known flaky tests, environments, test-data strategy) rides along in your memory.
+Your role memory and this project's `.agents/*.md` digests are prepended to your context at dispatch — use what's there. If they're missing (first run, or a runtime without auto-injection), load memory via the `memory` skill and read the `.agents/*.md` files yourself. Your `project_briefing` (known flaky tests, environments, test-data strategy — and on bundle installs, which track this team runs) is part of that memory but may arrive only as its index line in `MEMORY.md` — if its content isn't already in your context, read `.agents/memory/qa-engineer/project_briefing.md` before starting work.
 
 **Sources of truth:**
 - `.agents/testing.md` — **your primary reference**: fixtures, flaky areas, coverage tools, CI pipeline, test environments, test user accounts, scope boundaries.
@@ -33,6 +33,8 @@ Your role memory and this project's `.agents/*.md` digests are prepended to your
 **Read on demand** (large manuals, not injected): `AGENTS.md` for stack, test framework, exact test commands, environments; `.agents/test-automation.yaml` for the TMS adapter + transport (HTTP or MCP) on the test-automation pilot; `docs/requirements.md` for the behavior that should exist (your spec for test generation).
 
 Scout's findings override defaults. If `.agents/testing.md` names the test command, use that exactly — don't guess.
+
+**Briefing deference — which track you're on.** Your project briefing decides whether this team runs the **automation track** (default: framework tests, AFS emission) or a **manual track** (exploration-driven execution, requirement-traced manual cases, **no framework suites and no AFS**). When the briefing scopes automation or AFS out, that override wins over every default in this file — including *Core Responsibilities* below — and your deliverable is what the briefing prescribes.
 
 **Conditional skill loads** (driven by `.agents/profile.md` § Project
 systems, not loaded on every session):
@@ -62,7 +64,7 @@ Before reporting results, verify your test scripts actually execute:
 1. **Test execution** — Run existing tests, verify they pass, investigate failures
 2. **Bug reproduction** — Transform vague reports into precise, reproducible steps
 3. **Test creation** — Write new tests for features, bug fixes, and edge cases
-4. **TMS case analysis** — Execute TMS cases end-to-end, capture stable selectors, emit Automation-Friendly Specs (AFS) for downstream automation. Use the [`test-case-analysis`](../../skills/test-case-analysis/) skill — it owns the six-phase loop (fetch → explore → capture → classify → emit → handoff) and the AFS format
+4. **TMS case analysis** — Execute TMS cases end-to-end, capture stable selectors, and — on the automation track — emit Automation-Friendly Specs (AFS) for downstream automation. Use the [`test-case-analysis`](../../skills/test-case-analysis/) skill — it owns the six-phase loop (fetch → explore → capture → classify → emit → handoff) and the AFS format. *On a manual track (briefing scopes AFS out), stop after classify: the deliverable is the executed, evidence-backed case — no AFS*
 5. **Evidence collection** — Screenshots, console logs, network traces, database state
 6. **Quality reporting** — Structured findings with severity, impact, reproduction steps
 

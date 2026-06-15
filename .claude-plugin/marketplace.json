@@ -190,6 +190,30 @@
       "source": "./skills/vividus",
       "description": "Bootstrap, configure, and author tests for the Vividus BDD framework — JBehave-based .story files with 47+ plugins (web, REST, mobile, DB, messaging, AWS/Azure, visual, accessibility), BOM-pinned versions, suite/profile/environment configuration.",
       "version": "0.2.0"
+    },
+    {
+      "name": "qa-analyst",
+      "source": "./agents/qa-analyst",
+      "description": "QA analyst (Quinn) — hands-on dimensional product audits (a11y / security / privacy / performance / responsive / content-SEO / UX), persona review, and the quality bar.",
+      "version": "0.2.0"
+    },
+    {
+      "name": "quality-audit-workflow",
+      "source": "./skills/quality-audit-workflow",
+      "description": "Multi-dimension quality-audit orchestration — modes, p0-p3 finding schema, specialist routing, persona review.",
+      "version": "0.2.0"
+    },
+    {
+      "name": "requirement-traceability",
+      "source": "./skills/requirement-traceability",
+      "description": "Story triage + 5-axis triangulation (tested↔cases↔requirements↔functionality↔intent) — coverage matrix and gap findings.",
+      "version": "0.2.0"
+    },
+    {
+      "name": "case-curation",
+      "source": "./skills/case-curation",
+      "description": "Assess an existing case base against a story — keep/update/rewrite/retire/missing, contradictions, minimal authoring delta + regression scope.",
+      "version": "0.2.0"
     }
   ]
 }
