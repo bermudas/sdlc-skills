@@ -1,0 +1,5 @@
+node_modules/
+.DS_Store
+# Test artifacts produced at run time (default --root). Baselines you want to keep
+# should live in your project repo, not inside the skill; commit those deliberately.
+visual-tests/

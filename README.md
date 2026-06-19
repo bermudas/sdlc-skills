@@ -145,6 +145,7 @@ each host's native form — directories for Claude/Cursor/Windsurf, flat
 # per-role stack briefings, and team conventions). See bundles/SPEC.md.
 npx github:arozumenko/sdlc-skills init --bundle feature-development   # cross-platform delivery: pick python-dev, js-dev, test-automation-engineer, ios-dev
 npx github:arozumenko/sdlc-skills init --bundle manual-qa     # manual-QA team (live browser testing via Playwright MCP)
+npx github:arozumenko/sdlc-skills init --bundle quality-engineering  # in-sprint testing: triage → curate → author → execute → triangulate
 npx github:arozumenko/sdlc-skills init --bundle test-automation  # TMS-driven automation pipeline (analyst → implementer → reviewer, led by Tal)
 
 # Full catalog, all detected IDEs
@@ -168,13 +169,14 @@ npx github:arozumenko/sdlc-skills init --all --update
 set of agents (with their skills), seeds per-role stack briefings into
 `.agents/memory/<role>/`, splices team conventions into `AGENTS.md` /
 `CLAUDE.md`, applies per-role **skill overlays**, and can **seed reference
-files** into the project — one command instead of hand-listing roles. Three
+files** into the project — one command instead of hand-listing roles. Four
 ship today:
 
 | Bundle | Roster | What it's for |
 |---|---|---|
 | `feature-development` | core roles (scout, ba, project-manager, tech-lead, qa-engineer) + picked dev roles | Cross-platform delivery team — interactive picker selects any of `python-dev` (FastAPI/FastMCP backend), `js-dev` (JS/TS frontend), `test-automation-engineer` (web automation), `ios-dev` (Swift/SwiftUI); core roles auto-tune per picked platforms. |
 | `manual-qa` | 6 bundle-local agents (app-profiler, test-sizer, test-author, test-run-lead, test-runner, test-reporter) | Manual-QA team — `app-profiler` onboards the app, then `test-run-lead` orchestrates a run: authoring (`test-author`) and sizing (`test-sizer`) cases when needed, running them live via Playwright MCP (`test-runner`), and reporting (`test-reporter`). Ships its own agents and seeds the test-case/report-format reference docs into `.agents/manual-qa/knowledge/`. |
+| `quality-engineering` | 7 bundle-local agents (qe-lead, story-analyst, case-curator, test-author, test-runner, test-reporter, scout) | In-sprint testing team with structural separation of duties — `qe-lead` orchestrates requirement triage + cold review + 5-axis triangulation (`story-analyst`), reuse-first case curation (`case-curator`), authoring (`test-author`), bug-hunting execution that codifies passes for cheap replay (`test-runner`), and reporting (`test-reporter`). Owns the `case-curation`, `ui-bug-hunting`, and `visual-regression-testing` skills; seeds case/report/session-plan/matrix docs into `.agents/quality-engineering/knowledge/`. |
 | `test-automation` | shared core (scout) + test-automation-engineer + qa-engineer + bundle-local `test-automation-lead` (Tal) | Automation-focused team — Tal orchestrates the analyst → implementer → reviewer pipeline, owns test-framework architecture and the automation merge gate. Pins `test-automation-workflow` + `test-case-analysis`; TMS-agnostic. |
 
 See [`bundles/SPEC.md`](bundles/SPEC.md) and each bundle's `README.md` to

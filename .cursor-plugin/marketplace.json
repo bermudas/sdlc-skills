@@ -24,6 +24,12 @@
       "version": "0.2.0"
     },
     {
+      "name": "case-curator",
+      "source": "./bundles/quality-engineering/agents/case-curator",
+      "description": "Use when an incoming story needs the existing test-case base assessed before any authoring — inventories cases (TC files / xlsx / TMS), matches them to the story's ACs, classifies keep/update/rewrite/retire/missing, surfaces case-vs-story contradictions, and returns a minimal authoring delta plus a regression scope. Dispatched by the qe-lead after triage.",
+      "version": "0.2.0"
+    },
+    {
       "name": "ios-dev",
       "source": "./bundles/feature-development/agents/ios-dev",
       "description": "Use when iOS work needs to be implemented — Swift, SwiftUI features, SwiftData models, or any Apple-platform task requiring TDD and verification before handoff. Io — energetic developer, opinionated about modern Apple APIs, pragmatic about delivery.",
@@ -60,9 +66,21 @@
       "version": "0.2.0"
     },
     {
+      "name": "qe-lead",
+      "source": "./bundles/quality-engineering/agents/qe-lead",
+      "description": "Use when a story needs in-sprint testing end-to-end — the single orchestrator of the QE pipeline. Dispatches story-analyst (triage / case review / triangulation), case-curator, test-author, test-runner, and test-reporter as isolated sub-agents via the Agent tool, owns every gate and the audit trail, files questions and defects to the tracker. Run it as the active agent with a story id + build/environment.",
+      "version": "0.2.0"
+    },
+    {
       "name": "scout",
       "source": "./bundles/feature-development/agents/scout",
       "description": "Use when an unfamiliar codebase needs to be onboarded — generating CLAUDE.md, AGENTS.md, `.agents/` content docs, and per-role memory briefings from exploration so the rest of the team can hit the ground running. Kit — maps repositories, surfaces patterns, flags risks.",
+      "version": "0.2.0"
+    },
+    {
+      "name": "story-analyst",
+      "source": "./bundles/quality-engineering/agents/story-analyst",
+      "description": "Use for the QE pipeline's three analytical passes, one per dispatch — MODE TRIAGE (challenge a story for testability → gaps & questions), MODE CASE-REVIEW (cold review of authored cases vs the ACs), MODE TRIANGULATE (5-axis triangulation + independent final-results review). Never authors cases, never executes — dispatched by the qe-lead.",
       "version": "0.2.0"
     },
     {
@@ -115,7 +133,7 @@
     },
     {
       "name": "atlassian-content",
-      "source": "./bundles/test-automation/skills/atlassian-content",
+      "source": "./bundles/quality-engineering/skills/atlassian-content",
       "description": "Create well-formatted Jira issues/comments and Confluence pages on both Cloud and Server/Data Center, with mandatory post-creation re-fetch + repair. Load for \"file a bug\", \"comment on JIRA-123\", \"write up a decision page\", or any authored Atlassian content.",
       "version": "0.2.0"
     },
@@ -129,6 +147,12 @@
       "name": "bugfix-workflow",
       "source": "./bundles/feature-development/skills/bugfix-workflow",
       "description": "Use when the user says \"fix bug\", \"fix #NNN\", or you hit a failing test or reproducible defect that needs fixing end-to-end (not investigation alone). The full bugfix workflow from reproduction through a verified, documented fix.",
+      "version": "0.2.0"
+    },
+    {
+      "name": "case-curation",
+      "source": "./bundles/quality-engineering/skills/case-curation",
+      "description": "Use when assessing an existing test-case base against a story or requirement change — inventory and match cases to acceptance criteria, classify each as keep/update/rewrite/retire/missing, surface case-vs-story contradictions, and emit a minimal authoring delta plus a regression scope.",
       "version": "0.2.0"
     },
     {
@@ -206,13 +230,19 @@
     {
       "name": "playwright-testing",
       "source": "./bundles/feature-development/skills/playwright-testing",
-      "description": "UI/E2E test automation with Playwright MCP. Use when the user asks to \"test the UI\", \"automate browser tests\", \"check the page\", \"take a screenshot\", \"run Playwright\", \"write E2E tests\", or anything about browser-based testing.",
+      "description": "Use when a manual-QA agent does live browser testing through the Playwright MCP server — exploring/profiling a web app or executing a web test case against a running app, with no test code generated. Web/PWA/hybrid targets; used by app-profiler and test-runner. Mobile native → use mobile-testing instead.",
       "version": "0.2.0"
     },
     {
       "name": "reproducing-issues",
       "source": "./bundles/feature-development/skills/reproducing-issues",
       "description": "Turn a vague bug report into precise, repeatable steps with evidence and a CONFIRMED / CANNOT-REPRODUCE / PARTIAL verdict. Use when a bug is unclear or unconfirmed and needs reproduction before RCA or any fix. Reproduction and documentation only — does not fix code.",
+      "version": "0.2.0"
+    },
+    {
+      "name": "requirement-traceability",
+      "source": "./bundles/quality-engineering/skills/requirement-traceability",
+      "description": "Use when triaging requirements/stories for testability or running the 5-axis triangulation (tested↔cases↔requirements↔functionality↔intent) — emitting a gaps-and-questions report and a traceability matrix with uncovered / orphan / stale / weak-evidence coverage findings plus spec-deviation and intent-gap validation findings.",
       "version": "0.2.0"
     },
     {
@@ -246,15 +276,33 @@
       "version": "0.2.0"
     },
     {
+      "name": "test-generation",
+      "source": "./bundles/quality-engineering/skills/test-generation",
+      "description": "Use when proposing candidate test scenarios from a live page or audit findings as a prioritized coverage-gap report — handed to qa-engineer for AFS, never written as framework test files.",
+      "version": "0.2.0"
+    },
+    {
       "name": "tosca-automation",
       "source": "./skills/tosca-automation",
       "description": "Tricentis TOSCA Cloud automation via the bundled tosca_cli.py — create/update/run TestCases, Modules, Reusable Blocks, Playlists, folders, and TSU import/export. Use when the user asks to create a TOSCA test case, run a playlist, organize cases, or any TOSCA Cloud REST/CLI operation.",
       "version": "0.2.0"
     },
     {
+      "name": "ui-bug-hunting",
+      "source": "./bundles/quality-engineering/skills/ui-bug-hunting",
+      "description": "Bug-hunting discipline for UI test execution — find bugs, don't just pass tests. Use whenever executing test cases against a web UI, verifying pages or screenshots, doing exploratory or visual testing, or judging whether a build \"looks right\". Covers the hunt method (Job A/Job B, the four questions after every action, oracle challenges, findings ledger, pre-PASS reflection) plus a six-pass visual inspection for every screenshot (layout by measurement, image–text coherence, test-data leaks, passive page health, evidence quality). Load for any browser-driven test execution, manual case run, UI verification, fix verification, or \"check this page\" request — even when the task only asks for a pass/fail verdict.",
+      "version": "0.2.0"
+    },
+    {
       "name": "verifying-outcomes",
       "source": "./skills/verifying-outcomes",
       "description": "Goal-backward verification — checks whether the desired outcome was achieved, not whether tasks were marked done. Use when the user asks to \"verify\", \"did this actually work\", \"is X really done\" — or before you claim a task is complete and before closing an issue / merging a PR.",
+      "version": "0.2.0"
+    },
+    {
+      "name": "visual-regression-testing",
+      "source": "./bundles/quality-engineering/skills/visual-regression-testing",
+      "description": ">-",
       "version": "0.2.0"
     },
     {

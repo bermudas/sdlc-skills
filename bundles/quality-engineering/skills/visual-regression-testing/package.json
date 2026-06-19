@@ -1,0 +1,15 @@
+{
+  "name": "visual-check",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Agent-driven visual regression CLI: capture/compare baselines against the live browser the agent is already driving (over CDP).",
+  "bin": {
+    "visual-check": "scripts/visual-check.mjs"
+  },
+  "dependencies": {
+    "playwright-core": "^1.60.0",
+    "pixelmatch": "^7.1.0",
+    "pngjs": "^7.0.0"
+  }
+}
