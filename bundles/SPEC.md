@@ -105,7 +105,14 @@ factories/<id>/
 │   ├── hooks.json            hook config fragment (event → command)
 │   └── scripts/              scripts the hooks invoke (chmod +x on install)
 ├── agents/                  optional — agents this factory owns (real copies; same id may differ from other factories)
-│   └── <name>/               installed like a global agent (AGENT.md + SOUL.md)
+│   └── <name>/               installed like a global agent (AGENT.md + SOUL.md [+ RULES.md])
+│                            AGENT.md is the role's complete operating manual (standing
+│                            context on every host). RULES.md is optional and only a
+│                            dispatch-injection ECHO: when its header comment says
+│                            "copied verbatim from AGENT.md", validate-factories fails
+│                            on any line not found verbatim in AGENT.md; the installer
+│                            copies it beside SOUL.md into .agents/memory/<name>/ on
+│                            Copilot so the shared hooks inject it there too.
 └── skills/                  optional — skills this factory owns (real copies)
     └── <name>/               installed like a monorepo skill (SKILL.md + references/scripts)
 ```

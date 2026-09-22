@@ -114,6 +114,13 @@ human will install elsewhere — not code that executes in this repo.
 
 ## Conventions
 
+- `AGENT.md` is a role's **complete operating manual** — every standing rule
+  lives there, because it is the one file every host delivers as standing
+  context. `RULES.md` is only a dispatch-injection echo of it: a RULES.md whose
+  header says "copied verbatim from AGENT.md" is validated line-by-line against
+  AGENT.md (`bin/validate-factories.mjs`, `bin/rules-echo.test.mjs`). Skills are
+  libraries the body names at the step they apply; nothing behaviour-critical
+  may live only in a skill (Claude preloads `skills:`, other hosts do not).
 - Agents are **self-describing**: all metadata lives in `AGENT.md` frontmatter
   (`name`, `description`, `model`, `color`, `group`, `theme`, `aliases`,
   `skills`, `skills-on-demand`, optional `mcpServers`, optional

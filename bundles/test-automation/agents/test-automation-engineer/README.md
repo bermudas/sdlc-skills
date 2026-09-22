@@ -38,7 +38,7 @@ For **GitHub Copilot**, agents must be flat files — use the CLI with `--target
 
 ## Skills this agent uses
 
-In this repo: `test-automation-implementation`, `test-automation-workflow`, `browser-verify`, `code-review`, `reproducing-issues`, `issue-tracking`, `git-workflow`, `completing-a-task`, `memory`.
+All on demand — the agent body is the complete operating manual and names each library at the step it applies; nothing is preloaded. In this repo: `test-automation-implementation` (reference library), `test-automation-workflow` (reviewer contract, coverage contract, scaffolds), `browser-verify`, `code-review`, `reproducing-issues`, `issue-tracking`, `git-workflow`, `completing-a-task`, `memory`.
 
 External †: `playwright-best-practices`, `systematic-debugging`, `verification-before-completion`, `receiving-code-review`.
 

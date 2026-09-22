@@ -43,8 +43,8 @@ Role defaults (three agents; personas are assigned per `.agents/team-comms.md`):
 
 | Slot | Agent | Skill |
 |---|---|---|
-| Orchestrator | `test-automation-lead` (Tal) | `test-automation-workflow` (the orchestrator slot contract) |
-| Implementer | `test-automation-engineer` (Axel) | `test-automation-implementation` (six-phase loop; derives what to build straight from the case) |
+| Orchestrator | `test-automation-lead` (Tal) | its own `AGENT.md` is the complete operating manual; `test-automation-workflow` is the reference library it opens by name |
+| Implementer | `test-automation-engineer` (Axel) | its own `AGENT.md` (six-phase loop, Hard Rules, Run Report); `test-automation-implementation` is the reference library |
 | Reviewer | **fresh** `test-automation-engineer`-typed dispatch | `code-review` + the reviewer contract — static case↔code walk, no execution; independence comes from clean context + the contract, not a different agent file |
 | Hardening gate | fresh agent, dispatched by the lead (never the implementer that built, never the lead itself — a lead-run gate was the measured bottleneck) | once per batch, on the batch trunk — the merge signal; mechanics via `scripts/gate/gate-case.mjs` |
 
@@ -591,7 +591,8 @@ The full routing flow lives in the orchestration playbook —
 [`skills/test-automation-workflow/references/orchestration-playbook.md` § Canonical dispatch templates](../../factories/test-automation/skills/test-automation-workflow/references/orchestration-playbook.md#canonical-dispatch-templates).
 The engineer's own process (six-phase loop, the three route disciplines,
 no-defect-masking, Run Report template) is in
-[`skills/test-automation-implementation/SKILL.md`](../../factories/test-automation/skills/test-automation-implementation/SKILL.md);
+[`agents/test-automation-engineer/AGENT.md`](../../factories/test-automation/agents/test-automation-engineer/AGENT.md)
+(its reference library is [`skills/test-automation-implementation/SKILL.md`](../../factories/test-automation/skills/test-automation-implementation/SKILL.md));
 the coverage grammar in
 [`references/coverage-contract.md`](../../factories/test-automation/skills/test-automation-workflow/references/coverage-contract.md).
 Shape:

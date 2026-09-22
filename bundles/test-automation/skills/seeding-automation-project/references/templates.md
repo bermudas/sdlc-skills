@@ -597,6 +597,13 @@ docs rather than restating them.
   mixed repo, note which directories are which)
 - **Why this stack** (only if non-obvious from the repo)
 
+## Framework skill
+- **Skill:** <the installed skill carrying this framework's patterns and
+  design rules — `playwright-best-practices` for Playwright, `vividus`,
+  `tosca-automation`, a catalogue or project-local skill for Selenium,
+  qavajs or anything else — or `none`>. The engineer opens it before
+  building; its design rules win over the generic ones in the agent body.
+
 ## Execution provider
 - **Provider:** <manual-qa | self> — `manual-qa` when manual-qa personas
   are in the host agent roster **and** `.agents/manual-qa/` exists;
@@ -626,6 +633,18 @@ docs rather than restating them.
   project resolves it from `${<VAR_NAME>}` — record the actual var
   (matches `.agents/profile.md` § Environment & access) so generated
   code and test-runner dispatches point at the same target.
+
+## Merge gate
+- **N:** <consecutive green runs the gate requires before a unit merges;
+  default 3 when absent — raise for suites with parallel-interaction
+  flakes, never below 2>
+
+## Case ownership
+- **Owner:** <manual-qa | automation> — `manual-qa` (or absent → read-only
+  for TA) when manual-qa is installed or cases come from a TMS;
+  `automation` when the automating team also authors the markdown cases
+  in this repo. Even then, what a case asserts changes only through a
+  filed clarification.
 
 ## Run commands
 - **Single test, local:** exact command (include env wrappers and
@@ -661,6 +680,9 @@ docs rather than restating them.
   generate-shared-with-cleanup / mixed — and **how to tell which
   applies for a new test**
 - **Cleanup ownership:** afterEach / afterAll / external script / none
+- **Stable records tests may assert on read-only:** <record id → why it
+  is stable>; the environment tests run against and the credential env
+  keys (or a pointer to `.agents/profile.md` § Environment & access)
 - **Anything project-specific** (tenant scoping, env-keyed subfolders
   like `data/sit1/`, factories vs JSON, …)
 

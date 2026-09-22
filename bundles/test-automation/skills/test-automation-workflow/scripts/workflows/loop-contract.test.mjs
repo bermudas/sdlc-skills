@@ -70,13 +70,31 @@ test('the reviewer contract carries the classification for hosts with no workflo
   assert.match(r, /Do not withhold the classification/);
 });
 
+// The implementer contract's canonical home is the engineer's AGENT.md — the one
+// copy every host delivers as standing context (Claude preload, Copilot flat
+// file, Codex TOML). The implementation skill is a reference library now.
+const ENGINEER_BODY = '../../../../agents/test-automation-engineer/AGENT.md';
+
 test('the implementer contract separates rerun budget from fix rounds', () => {
-  const i = read('../../../test-automation-implementation/SKILL.md');
+  const i = read(ENGINEER_BODY);
   assert.match(i, /NOT a budget for fix rounds after a review/);
   assert.match(i, /Address every blocking finding/);
   // "I couldn't, because X" must be a first-class answer, or silence wins.
   assert.match(i, /say so in `notes` with the reason/);
   assert.match(i, /Leaving it silent is not/);
+});
+
+// The lead's canonical copy is its AGENT.md (standing context on every host);
+// the playbook keeps the long form. Both must carry the rule.
+const LEAD_BODY = '../../../../agents/test-automation-lead/AGENT.md';
+
+test('the lead body tells a lead running the loop by hand to use the same rule', () => {
+  const l = read(LEAD_BODY);
+  assert.match(l, /The fix loop runs until the reviewer APPROVES/);
+  assert.match(l, /go round again/);
+  assert.match(l, /Running by hand, you are the loop, and the contract is identical/);
+  assert.match(l, /It is not about review rounds/);
+  assert.match(l, /Builder reruns/);
 });
 
 test('the playbook tells a lead running the loop by hand to use the same rule', () => {
@@ -141,12 +159,13 @@ test('the sequential path gets the same gate run shape, not just the workflow', 
 });
 
 test('the cross-slot rule is in the docs, so it holds without a workflow too', () => {
-  const p = refs('orchestration-playbook.md');
-  assert.match(p, /Never idle on a background job — every slot, not just the builder/);
-  assert.match(p, /a slot that idles looks exactly like a slot that is thinking/i);
-  // The gate is named as the most exposed, since it is the least obvious.
-  assert.match(p, /N consecutive\*\* suite runs/);
-  const i = read('../../../test-automation-implementation/SKILL.md');
+  for (const [name, text] of [['playbook', refs('orchestration-playbook.md')], ['lead body', read(LEAD_BODY)]]) {
+    assert.match(text, /Never idle on a background job — every slot, not just the builder/, name);
+    assert.match(text, /a slot that idles looks exactly like a slot that is thinking/i, name);
+    // The gate is named as the most exposed, since it is the least obvious.
+    assert.match(text, /N consecutive\*\* suite runs/, name);
+  }
+  const i = read(ENGINEER_BODY);
   assert.match(i, /Run it in the FOREGROUND/);
   assert.match(i, /Never end a turn with "I'll wait for this to complete"/);
 });

@@ -116,7 +116,7 @@
     {
       "name": "test-automation-lead",
       "source": "./bundles/test-automation/agents/test-automation-lead",
-      "description": "Use when a batch of ready test cases needs to be automated, when technical suite work (tech-debt, migrations, improvements) needs planning and batching, when an automation PR needs the merge gate, when the existing suite needs triage (red/flaky CI, maintenance), or when test-automation framework architecture needs a decision (bootstrap, framework-scale work, mid-flow escalation). Tal — runs the batch pipeline (units one at a time on a batch trunk: route on execution evidence — or a tech-task brief for non-case units — build, static review, merge back, then one hardening gate per batch), owns the automation merge, owns test-framework architecture.",
+      "description": "Use when test cases or a story's acceptance criteria need to be automated, when technical suite work (tech-debt, migrations, improvements, suite health) needs planning, when an automation PR needs the merge gate, when the existing suite needs triage (red/flaky CI, maintenance), or when test-automation framework architecture needs a decision (bootstrap, framework-scale work, mid-flow escalation). Tal — runs the unit loop (take in, build, static review, prove, merge, mirror), owns the automation merge, owns test-framework architecture.",
       "version": "0.2.0"
     },
     {
@@ -312,6 +312,12 @@
       "version": "0.2.0"
     },
     {
+      "name": "quality-evals",
+      "source": "./bundles/manual-qa/skills/quality-evals",
+      "description": "Use when a team wants to validate test-runner's bug-detection accuracy or test-author's authoring fidelity against their OWN app before trusting the manual-qa bundle on real work — \"how good is this agent, really\", \"benchmark test-author/test-runner\", \"build a gold suite\", \"self-eval the manual QA team\". Ports a held-out-answer-key eval methodology (deterministic Tier A scoring + a judged Tier B rubric) that keeps a self-authored eval honest, generalized to any app.",
+      "version": "0.2.0"
+    },
+    {
       "name": "reproducing-issues",
       "source": "./bundles/feature-development/skills/reproducing-issues",
       "description": "Use when a bug is unclear or unconfirmed and needs reproduction before RCA or any fix. Turns a vague bug report into precise, repeatable steps with evidence and a CONFIRMED / CANNOT-REPRODUCE / PARTIAL verdict. Reproduction and documentation only — does not fix code.",
@@ -356,7 +362,7 @@
     {
       "name": "test-automation-implementation",
       "source": "./bundles/test-automation/skills/test-automation-implementation",
-      "description": "Use when a test case needs to become a green, framework-resident test — the build slot of the test-automation pipeline, from case to green test. Six-phase loop (Absorb → Investigate → Automate → Execute → Debug → Handoff), the 12 Hard Rules, the coverage declaration, the Run Report. Orchestration: test-automation-workflow.",
+      "description": "Reference library for the build slot of the test-automation pipeline — live investigation and the surface cache, defect filing with the pristine-repro gate, extending a covering spec, reporter and diagnostics tiers, Playwright patterns, and the field evidence behind the engineer's rules. The engineer's operating procedure itself (six-phase loop, Hard Rules, coverage declaration, Run Report) lives in the test-automation-engineer agent body; open a reference here when that body names it.",
       "version": "0.2.0"
     },
     {

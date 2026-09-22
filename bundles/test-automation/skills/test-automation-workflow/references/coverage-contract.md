@@ -42,7 +42,7 @@ blocking at review and at the gate.
 
 | Category | Required referent |
 |---|---|
-| `covered-elsewhere` | name of the existing test that asserts it |
+| `covered-elsewhere` | name of an existing test **merged to base** that asserts the same observable (a project may widen the scope in `.agents/testing.md § Coverage idiom`) |
 | `blocked-by-defect` | filed defect id |
 | `un-automatable` | category from automation-scoping's complexity taxonomy |
 | `by-seeded-policy` | the policy line in `.agents/testing.md` |

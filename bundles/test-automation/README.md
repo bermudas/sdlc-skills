@@ -20,21 +20,41 @@ handles, waits, quirks). Batch state — case snapshots, the report, `cost.json`
 npx github:arozumenko/sdlc-skills init --factory test-automation
 ```
 
-Drops the three agents into `.claude/`, pulls their skills (incl.
-`test-automation-workflow` + `test-automation-implementation`), wires the
-memory/context hooks, and splices `instructions.md` into `AGENTS.md`.
+Drops the three agents into the host's agent dir (`.claude/agents/`,
+`.github/agents/`, …), installs their libraries (`test-automation-workflow`,
+`test-automation-implementation`, …) on disk, wires the memory/context hooks,
+and splices `instructions.md` into `AGENTS.md`.
+
+## How the factory is built to behave the same on every host
+
+Three kinds of content, each with exactly one home and one delivery channel:
+
+| Kind | Home | Reaches the agent via |
+|---|---|---|
+| **Standing rules** — everything a role must always do (its loop, its contract, the Hard Rules, the Run Report, the host rules) | the role's `AGENT.md` | the host itself: Claude Code, Copilot CLI, VS Code Copilot Chat and Codex all read the agent file natively. `SOUL.md` (persona) and `RULES.md` (a ≤10-line verbatim echo of AGENT.md, enforced by `npm run validate`) are injected at dispatch by the shared hooks on every host. |
+| **Project facts** — framework, provider policy, coverage idiom, conventions, branch policy | `.agents/*.md`, `.agents/test-automation.yaml` (seeded by scout) | the shared hooks: inlined on Claude Code, mirrored to `.github/instructions/*.md` on Copilot |
+| **Reference material** — TMS adapters, scaffolds, reviewer contract, investigation and defect-filing detail, Claude Workflow scripts | the two library skills' `references/` and `scripts/` | opened by name at the step the agent body names; **never assumed to be in context** — `skills:` is empty on all three roles, every library sits in `skills-on-demand:` |
+
+The consequence is that no rule depends on a host feature: no preload, no
+Workflow tool, no background notifications, no hook that might not fire. The
+unit of work is one synchronous dispatch that returns one Run Report; a batch is
+that loop N times, and Claude Code's shipped workflow scripts merely run it
+faster. Five host rules sit verbatim in the lead's and the engineer's bodies:
+nothing wakes a waiting agent; one unit per dispatch; images stay on disk (text first, a
+picture only when it answers what text cannot, never the same one twice); exit only with a Run Report; a dead dispatch is split,
+never retried with the same prompt.
 
 ## Roster
 
 | Role | Agent | Source | Job |
 |---|---|---|---|
 | Onboarding | `scout` (Kit) | factory-local | Seeds framework / TMS adapter / base branch / merge policy into `.agents/` — plus the **execution provider** (`manual-qa` \| `self`) and the **coverage idiom** into `.agents/testing.md`. |
-| Lead / orchestrator (PM + tech-lead combined) | `test-automation-lead` (Tal) | factory-local | Runs the batch pipeline, routes each unit, owns framework architecture + the automation merge gate. The user launches Tal directly. |
+| Lead / orchestrator (PM + tech-lead combined) | `test-automation-lead` (Tal) | factory-local | Takes work in (cases, a story's acceptance criteria, tech tasks), runs the unit loop — build → static review → prove → merge → mirror — owns framework architecture + the automation merge. The user launches Tal directly. |
 | Implementer + reviewer | `test-automation-engineer` (Axel) | factory-local | Derives what to build straight from the case, writes the code, files defects. The **reviewer slot** is a fresh engineer-typed dispatch (clean context + `code-review` + the reviewer contract) — independence comes from the contract, not from a different agent file. |
 
 **`qa-engineer` (Sage) is removed.** Its functions re-homed: live case
 execution → manual-qa (or the engineer's combined mode standalone); screening
-→ the intake clustering + sizing pass; spec derivation → the engineer's build
+→ the lead's sizing at take-in; spec derivation → the engineer's build
 dispatch; review → the fresh engineer-typed reviewer dispatch; defect filing →
 the engineer ("file and walk away"). **Migrating an existing install:** after
 `init --update`, re-run scout — its migration pass sweeps
@@ -93,7 +113,7 @@ scout detects the co-install at seeding and records the policy in
 
 | Install | Provider | Routes in play |
 |---|---|---|
-| standalone | `self` | `combined` for everything — the first green run of the automated test **is** the case's first execution; live probing is targeted investigation, not a walkthrough |
+| standalone (or no § Execution provider seeded) | `self` | `combined` for everything — the first green run of the automated test **is** the case's first execution; the engineer may walk the scenario live first when the surface is new, files a defect when the scenario does not work in the product, and probes rather than walks once the surface cache answers |
 | co-install | `manual-qa` | `manual-qa-verified` — PASS run record + authored case exist → build from that evidence, **no re-execution**, cite the run id; otherwise `needs-execution` — Tal dispatches manual-qa's `test-runner` per case (PASS → build; FAIL → defect filed, case not automated until fixed; dispatch impossible → the unit *stays* `needs-execution` and the report says run the manual-qa suite first — **never** a silent fallback to self-execution) |
 
 ## Quick start
@@ -146,22 +166,23 @@ For a shop where the manual-qa factory authors the cases:
 > File each automation task as its own GitHub issue under the `Automation`
 > milestone. Auto-merge is fine.
 
-**Phase 2 — Usage (Tal runs the batch pipeline).** Drop a batch of cases on
-him (a single case is just a batch of one): _"Automate TC-1234, TC-1235,
-TC-1236."_ He resolves the work set with **one TMS sweep**, snapshots each
-case body to disk, and screens the batch (clustering + sizing; un-automatable
-and already-covered verdicts are made **here**, before any build). Each unit
-is then routed (`manual-qa-verified` / `needs-execution` / `combined` — table
-above) and runs **one at a time on a batch trunk**: the engineer builds on a
-branch cut from the trunk (green once, PR open, coverage declaration in the
-spec) → a **fresh engineer-typed reviewer** walks the case step-by-step
-against that declaration (static, no execution) → fix rounds until approved →
-merge back. Once every unit has merged, the **hardening gate** — its own
-agent, never the one who wrote the code — runs the batch's specs together for
-N consecutive green (default 3), plus one run of the specs the batch could
-have broken. Then **one report**. Tal reads it and closes: merges, routes
-findings, back-writes the TMS once (automation executions only), and replans
-whatever didn't land.
+**Phase 2 — Usage (Tal runs the unit loop).** Drop work on him — cases, a
+story with acceptance criteria, a tech task: _"Automate TC-1234, TC-1235,
+TC-1236."_ He reads each in full, dedups against merged specs and the
+tracker, snapshots external bodies to disk, sizes each unit himself
+(un-automatable and already-covered verdicts are made **here**, before any
+build), routes it (`manual-qa-verified` / `needs-execution` / `combined` —
+table above), and runs the loop **one unit at a time**: the engineer builds on
+the unit's branch (green once, PR open, coverage declaration in the spec) → a
+**fresh engineer-typed reviewer** walks the case step-by-step against that
+declaration (static unless asked to re-run) → fix rounds until approved → the
+**gate** — its own agent, never the one who wrote the code — runs the unit's
+specs N consecutive green (default 3), the specs a modified symbol reaches
+once, the coverage-grammar grep and the CI-selection check → merge per the
+project's PR policy → tracker and TMS mirrored (automation executions only).
+One report per batch; whatever didn't land is replanned. On Claude Code, when
+you or the seed ask for a batch to run as a workflow, the shipped scripts run
+the same loop on a batch trunk with one machine-readable report.
 
 **Not just cases.** Tech-debt, migrations, framework improvements and suite
 health run the **same loop** — a [tech-task brief](skills/test-automation-workflow/references/tech-task-brief.md)
@@ -202,6 +223,11 @@ the agent files: that keeps your install cleanly updatable with
 diverge.
 
 ### How it flows
+
+The diagram shows the batch shape as the Claude Code workflow runs it (batch
+trunk, one hardening gate, one report). A single unit — the everyday case on
+any host — runs the same loop on its own branch with its own gate and merges
+per the project's PR policy.
 
 ```mermaid
 flowchart TD
@@ -315,12 +341,14 @@ whole team on the case → merged-test pipeline.
 
 ## What gets installed
 
-- The three agents above (all factory-owned), with their declared skills.
-- The pipeline skills (`test-automation-workflow`,
-  `test-automation-implementation`, `seeding-automation-project`,
-  `automation-scoping`, …) factory-local via `localSkills`; the project's TMS
-  adapter skill loads conditionally (e.g. `xray-testing` only when the project
-  declares `tms.adapter: xray`).
+- The three agents above (all factory-owned). Each `AGENT.md` is the role's
+  complete operating manual; `RULES.md` is its verbatim echo for dispatch
+  injection (also copied to `.agents/memory/<role>/` on Copilot).
+- The libraries (`test-automation-workflow`, `test-automation-implementation`,
+  `seeding-automation-project`, `automation-scoping`, …) factory-local via
+  `localSkills`, all `skills-on-demand:` — installed on disk, opened by name;
+  the project's TMS adapter skill loads conditionally (e.g. `xray-testing` only
+  when the project declares `tms.adapter: xray`).
 - Project briefings seeded to `.agents/memory/<role>/project_briefing.md` for
   all three roles.
 - Team conventions spliced into `AGENTS.md` (inside

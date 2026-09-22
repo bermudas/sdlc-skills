@@ -11,7 +11,7 @@ type: project
 - **Your slot:** builder. Tal hands you a case (TMS id or `tasks/<suite>/TC-*.md`
   path), its route, and whatever execution evidence exists (a manual-qa run
   record or test-runner result); you return a PR-ready diff plus a Run Report
-  (template in `test-automation-implementation`).
+  (template in your AGENT.md § Run Report).
 - **Read first every session:** `.agents/testing.md` (framework, run command,
   abstraction-layer convention, handle strategy, § Execution provider,
   § Coverage idiom), `.agents/profile.md` (base URL/endpoint, credentials
@@ -28,24 +28,25 @@ type: project
   asserted or excluded with a closed-vocabulary category + verifiable referent
   (grammar in the implementation skill; idiom per `.agents/testing.md
   § Coverage idiom`). Free-text reasons block at review.
-- **No defect masking:** the `test-automation-implementation` skill § Hard Rules → 2 forbids
+- **No defect masking:** your AGENT.md § Hard Rules → 2 forbids
   `test.fail()`, `xit()`, `@Ignore`, `pytest.skip()`, and weakened assertions for
-  product defects. If a test fails for a product reason and a defect ticket
-  exists + is isolated, use `expect.soft()` with a `// Known defect: <TICKET-ID>`
-  comment; otherwise let it fail and report `blocked`.
-- **Stay on your case branch cut from the batch trunk.** Don't switch, rebase, or touch git history
+  product defects. A product defect is filed, then declared: step-isolated →
+  a `blocked-by-defect: <TICKET>` exclusion in the coverage block (spec stays
+  green, `coverage: partial`); case-blocking → let it fail, return
+  `defect-found`. `expect.soft()` only where the seed asks for a visible red.
+- **Stay on your unit branch.** Don't switch, rebase, or touch git history
   unless `.agents/workflow.md` grants you commit authority for this project.
 
 ## My Role Focus
 
 Write the test code through the project's abstraction layer (page objects /
 API client / service object / scenario module) to automate the case, against
-the real system, on your case branch cut from the batch trunk — investigation included: derive
+the real system, on your unit branch — investigation included: derive
 the assertions from the case's steps, resolve handles cheapest-first (surface
 cache → manual-qa knowledge, read-only → the case → targeted live probing).
-Green ONCE locally is enough — the **batch hardening gate** (a fresh engineer
-Tal dispatches — never you certifying your own build — N× consecutive green on
-the integration branch, once per batch) is what accepts the work for merge, not
-your local run or the reviewer's APPROVED. Soft retry budget ≤ 2 reruns against
+Green ONCE locally is enough — the **gate** (a fresh engineer Tal dispatches —
+never you certifying your own build — N× consecutive green plus the blast
+radius once) is what accepts the work for merge, not your local run or the
+reviewer's APPROVED. Soft retry budget ≤ 2 reruns against
 the same root cause, then escalate (`needs-escalation`, or return the case gap
 to Tal). Hand back a Run Report — never a bare "done."

@@ -95,6 +95,37 @@ const SUPPORT_LEVELS = new Set(["Self-Serve", "Best Effort Support", "Dedicated 
 // feeds a risky-unquoted-value scan that must inspect the text pre-parse,
 // since parseFrontmatter already strips quotes. Returns an array of error
 // strings (empty when valid); callers route each through err(id, msg).
+// RULES.md is a dispatch-injection ECHO of AGENT.md, never a canonical home
+// (hooks deliver it at dispatch; the agent body is what every host delivers
+// as standing context). A RULES.md that opts in — its header comment carries
+// the phrase "copied verbatim from AGENT.md" — must consist only of lines that
+// appear verbatim in AGENT.md (whitespace-normalised). Comment lines, blank
+// lines and the hook's "RULES:" preamble are skipped. Returns the offending
+// lines; empty when the echo is faithful or the file did not opt in.
+export const RULES_ECHO_OPT_IN = "copied verbatim from AGENT.md";
+export function rulesEchoViolations(agentText, rulesText) {
+  if (!rulesText.includes(RULES_ECHO_OPT_IN)) return [];
+  const norm = (s) => s.replace(/\s+/g, " ").trim();
+  const body = norm(agentText);
+  const out = [];
+  let inComment = false;
+  for (const raw of rulesText.split(/\r?\n/)) {
+    let line = raw;
+    if (inComment) {
+      if (line.includes("-->")) inComment = false;
+      continue;
+    }
+    if (line.trimStart().startsWith("<!--")) {
+      if (!line.includes("-->")) inComment = true;
+      continue;
+    }
+    line = norm(line.replace(/^\s*[-*]\s+/, ""));
+    if (!line || line.startsWith("RULES:")) continue;
+    if (!body.includes(line)) out.push(raw.trim());
+  }
+  return out;
+}
+
 export function checkFactoryFrontmatter(id, fm, rawLines = []) {
   const errs = [];
   for (const k of ["name", "description", "owner", "authors", "sdlc_phase"])
@@ -300,6 +331,15 @@ function main() {
         err(id, `localAgent "${la}" missing agents/${la}/AGENT.md`);
       if (existsSync(ap) && lstatSync(ap).isSymbolicLink())
         err(id, `agent "${la}" must be a real directory, not a symlink`);
+      // RULES.md echo contract (opt-in via its header comment).
+      if (existsSync(join(ap, "AGENT.md")) && existsSync(join(ap, "RULES.md"))) {
+        const bad = rulesEchoViolations(
+          readFileSync(join(ap, "AGENT.md"), "utf8"),
+          readFileSync(join(ap, "RULES.md"), "utf8"),
+        );
+        for (const l of bad)
+          err(id, `agents/${la}/RULES.md line is not verbatim in AGENT.md: "${l.slice(0, 80)}"`);
+      }
     }
 
     for (const src of Object.keys(b.seed || {}))

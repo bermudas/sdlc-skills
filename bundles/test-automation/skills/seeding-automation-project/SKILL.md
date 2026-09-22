@@ -257,8 +257,10 @@ infrastructure diagram (text-based).
 The lead and engineer read this before touching tests. Include test
 framework and config, how to run tests (exact commands), fixture/setup
 patterns, test data strategy, CI test pipeline, coverage tools, known
-flaky areas — plus four pipeline-policy sections the batch pipeline
-can't run without (templates in `references/templates.md` § testing.md):
+flaky areas — plus the policy sections the unit loop reads; the lead and
+the engineer apply a documented default when one is absent, so seed what you
+can verify and leave the rest out (templates in `references/templates.md`
+§ testing.md):
 
 - **§ Execution provider** — `manual-qa | self`. Detection: manual-qa
   personas in the host agent roster (Step 6.5's enumeration —
@@ -278,6 +280,26 @@ can't run without (templates in `references/templates.md` § testing.md):
   (manual-qa convention); record the project's concrete env var
   (e.g. `BASE_URL`) so generated code and test-runner dispatches
   resolve it identically.
+- **§ Merge gate** — N consecutive green runs the gate requires before a
+  unit merges (default 3 when absent); raise it for suites with known
+  parallel-interaction flakes, never lower it below 2.
+- **§ Case ownership** — `manual-qa | automation`. Who may edit the case
+  files: `manual-qa` (or absent → read-only for TA) when manual-qa is
+  installed or the cases come from a TMS; `automation` when the team that
+  automates also authors the markdown cases in this repo. Even then, *what*
+  a case asserts changes only through a filed clarification.
+- **§ Test data strategy** — the existing section, plus the catalogue of
+  stable records tests may assert on read-only (record id → why it is
+  stable), the environment tests run against, and the credential env keys.
+  Absent → the engineer follows the neighbouring tests and names each data
+  assumption in the spec.
+- **§ Framework skill** — the installed skill that carries this framework's
+  patterns and design rules: `playwright-best-practices` for Playwright,
+  `vividus`, `tosca-automation`, a catalogue or project-local skill for
+  Selenium, qavajs or anything else — or `none`. The engineer opens it before
+  building and its design rules win over the generic ones in the agent body.
+  Install a matching skill before seeding when one exists
+  (`npx skills find <framework>`, or the registry).
 
 ## Step 6.5 — Generate .agents/team-comms.md
 

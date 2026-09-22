@@ -316,14 +316,10 @@ const quote = (s, max = 400) => String(s ?? '')
 const PREAMBLE =
   'You are dispatched from the batch workflow. If your role memory / project ' +
   'briefing / .agents/*.md digests are not already in your context, load them ' +
-  'now (memory skill; read the files). Confirm your slot skill / contract is ' +
-  'PRESENT before touching anything — confirming means CHECKING your context ' +
-  '(your `skills:` frontmatter content is preloaded; you can see its headings), ' +
+  'now (memory skill; read the files). Open a library (Skill tool, or Read by ' +
+  'path) only at the step that names it, ' +
   'NEVER re-invoking the Skill tool for a skill you already carry: every ' +
-  'invocation pastes the FULL skill text again (measured 2026-08-18: one ' +
-  'dispatch re-loaded 10 preloaded skills — ~25k tokens of duplicate context). ' +
-  'The Skill tool is for skills genuinely ABSENT from your context — your ' +
-  'skills-on-demand, or a preload that visibly failed. ' +
+  'invocation pastes the FULL skill text again. ' +
   // The findings channel: a durable gotcha has somewhere to go that is read.
   'Anything worth telling someone that did NOT stop you — a product defect you ' +
   'filed, a place the case text disagrees with the live product, an open ' +
@@ -920,7 +916,7 @@ async function runBuild(members, evidence, route) {
     : `EXECUTION PROVENANCE: this unit was already executed live by manual-qa — do NOT re-execute a case end-to-end in a browser (a targeted probe for a locator or a wait is fine; a full walkthrough re-buys what the evidence already paid for). Evidence to build from: ${evidence.length ? evidence.join(' ; ') : '(none listed — treat as thin, probe live for what is missing)'} plus the .agents/manual-qa/ KB. Cite the manual-qa run as the unit's execution provenance in your PR/notes. ${route === 'manual-qa-verified' ? 'If the evidence does not hold for a case (no PASS verdict, case file missing, contradicts the snapshot), return status needs-execution and STOP — under the manual-qa provider you never execute the case yourself. ' : ''}`
 
   const b = await agent(
-    `${PREAMBLE}\n\nBuild slot — turn ${members.map((c) => `${c.id}${c.title ? ` (${quote(c.title, 120)})` : ''}`).join(', ')} into automated tests in ONE dispatch, per your test-automation-implementation skill (preloaded; confirm per the preamble). ` +
+    `${PREAMBLE}\n\nBuild slot — turn ${members.map((c) => `${c.id}${c.title ? ` (${quote(c.title, 120)})` : ''}`).join(', ')} into automated tests in ONE dispatch, ` +
     `THE CASE IS THE SOURCE OF TRUTH and you never edit it. Read each case in full first: ${ids.map((id) => SRC(id)).join(' , ')} (written at intake; ONLY if missing, fetch via the project's TMS adapter (.agents/test-automation.yaml) and note the gap). Derive what to automate straight from its steps and expected results — there is no intermediate spec artifact. ` +
     provenance +
     'LOCATOR LADDER (cheapest first): (1) the surface cache `.agents/automation/surface/<feature>.md` — verify handles as you use them; (2) manual-qa knowledge, READ-ONLY: `.agents/manual-qa/app_profile.md` § Reliable Selectors and § Fragile Areas — reference their facts, never copy them; (3) the case file itself; (4) targeted live probing. Everything a live probe teaches you goes BACK into the surface cache: create or update the feature\'s file and commit it on your branch with the code. ' +
@@ -1162,7 +1158,7 @@ async function buildUnit(u, impl) {
     const skipped = (r.blocking_detail ?? []).filter((d) => d.status === 'unaddressed').map((d) => quote(d.item))
     const fix = await agent(
       carve
-        ? `${PREAMBLE}\n\nImplementer slot — SPLIT unit ${ids.join(', ')} on branch ${impl.branch} per your test-automation-implementation skill. ` +
+        ? `${PREAMBLE}\n\nImplementer slot — SPLIT unit ${ids.join(', ')} on branch ${impl.branch} ` +
           workspaceNote +
           `Review cannot pass ${carve.stuck.join(', ')} (${quote(carve.why, 200)}), and holding the whole unit hostage would strand the finished cases — so carve the stuck case(s) out of the unit's SCOPE while keeping every deliverable that is sound:\n` +
           `1. QUARANTINE by default — the code is usually fine and only the CASE is stuck. Mark ${carve.stuck.join(', ')}'s tests skipped per the project's convention (e.g. \`pytest.mark.skip(reason="blocked: <blocker> — carved from ${ul}")\`; parameterized/data-table specs: mark just their rows via \`pytest.param(..., marks=...)\`). The finished code ships INERT on the trunk and re-arms by deleting the marker once the blocker clears. Quarantine is DECLARED, never silent: the reason must quote the blocker, the runner must report the test as skipped — that declaration is what makes this the sanctioned exception to the masking hunt, because a quarantined case recorded blocked claims nothing.\n` +
@@ -1171,7 +1167,7 @@ async function buildUnit(u, impl) {
           "4. Do NOT touch the remaining cases' logic or assertions beyond steps 1–2. Re-run the remaining spec(s) once (collect-only where execution is environment-blocked), confirm quarantined tests report as SKIPPED not passed, commit by path, then push and update the PR body with what was carved and why — where the project uses a remote/PRs (§ Automation PR policy); locally the commit alone is enough.\n" +
           'Return status built; your notes MUST START with `quarantined:<paths>` or `preserved@<sha>` per mode, then name exactly what was marked or removed. Return coverage for the REMAINING cases as it stands. ' +
           `Return unit_ids EXACTLY as given here: [${ids.join(', ')}].`
-        : `${PREAMBLE}\n\nImplementer slot — fix round ${round} for ${ids.join(', ')} on branch ${impl.branch} per your test-automation-implementation skill. ` +
+        : `${PREAMBLE}\n\nImplementer slot — fix round ${round} for ${ids.join(', ')} on branch ${impl.branch} ` +
           workspaceNote +
           'Load your receiving-code-review skill first if it is not in your context (it is on-demand, not preloaded) — it is the contract for this exact moment. ' +
           'Address EACH blocking finding (verify against the code first) and add the regression test that would have caught it, re-run the affected spec green once, commit — and update the PR where the project uses one (§ Automation PR policy):\n- ' +

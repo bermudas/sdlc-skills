@@ -620,10 +620,11 @@ test('no wholesale tree cleaning: receipts + fresh writes are protected', () => 
   assert.match(text, /untracked bookkeeping/);
 });
 
-test('the preamble forbids re-loading preloaded skills via the Skill tool', () => {
-  assert.match(text, /confirming means CHECKING your context/);
+test('the preamble opens libraries only at the step that names them and forbids re-loading one already in context', () => {
+  // The test reads the script SOURCE, so each phrase must sit inside one string fragment.
+  assert.match(text, /Open a library \(Skill tool, or Read by/);
+  assert.match(text, /only at the step that names it/);
   assert.match(text, /NEVER re-invoking the Skill tool for a skill you already carry/);
-  assert.match(text, /genuinely ABSENT from your context/);
 });
 
 test('PREAMBLE carries the context-economy rules for every dispatch', () => {
