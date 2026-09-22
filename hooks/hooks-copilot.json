@@ -22,7 +22,8 @@
     "SubagentStart": [
       {
         "type": "command",
-        "command": "\"./hooks/run-hook.cmd\" agent-start",
+        "bash": "\"./hooks/run-hook.cmd\" agent-start",
+        "powershell": "& \"./hooks/run-hook.cmd\" agent-start",
         "env": { "SDLC_VSCODE": "1" },
         "timeout": 10
       }

@@ -38,6 +38,9 @@ if [ -z "$agent" ]; then
   # the subagentStart pipe open, killing the hook with no output (the worker then
   # gets no memory). See read_stdin_payload in lib.sh.
   payload="$(read_stdin_payload)"
+  # A COPILOT_CLI=1 entry run by VS Code's native loop (Claude-dialect payload,
+  # `hook_event_name` present) must answer in the Claude shape, not the CLI's.
+  apply_payload_dialect "$payload"
   for key in agentName agent_name subagent_type agent_type agentType name; do
     agent="$(json_string_field "$payload" "$key")"
     [ -n "$agent" ] && break

@@ -611,6 +611,26 @@ is_codex() {
   [ -n "${CODEX_HOOK:-}" ] || [ -n "${PLUGIN_ROOT:-}" ]
 }
 
+# Correct the Copilot dialect from the payload. The Copilot entries in
+# hooks-copilot.json carry COPILOT_CLI=1, but VS Code's native chat loop runs
+# the very same entries (it maps `sessionStart` → `SessionStart` itself) and
+# reads ONLY the Claude shape (hookSpecificOutput.additionalContext) — a
+# top-level additionalContext is silently dropped there (Copilot Chat 0.65,
+# VS Code 1.137, verified in the extension source). The flag alone cannot tell
+# the two engines apart; the payload can: every Claude-dialect host (Claude
+# Code, VS Code Copilot Chat, Codex) sends `hook_event_name`, while the Copilot
+# CLI never does (its fields are camelCase: sessionId, agentName). So when the
+# entry says CLI but the payload says Claude-dialect, switch to the VS Code
+# shape and clear the CLI flag (VS Code agents DO inherit instruction files,
+# so agent-start must not treat them as CLI sub-agents). $1 = raw payload.
+apply_payload_dialect() {
+  [ -n "${COPILOT_CLI:-}" ] || return 0
+  case "$1" in
+    *'"hook_event_name"'*) SDLC_VSCODE=1; COPILOT_CLI="" ;;
+  esac
+  return 0
+}
+
 # True on runtimes whose per-agent start hook can BOTH name the agent AND
 # inject context: Claude Code (SubagentStart), Codex (SubagentStart), Copilot
 # CLI (subagentStart), VS Code Copilot Chat (SubagentStart). These load per-role

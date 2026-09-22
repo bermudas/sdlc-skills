@@ -95,6 +95,12 @@ scheme superpowers uses), so one script serves every runtime:
 - `PLUGIN_ROOT` set or `CODEX_HOOK=1` → `{ "hookSpecificOutput": { "hookEventName": ..., "additionalContext": ... } }` (Codex; same shape as CC)
 - `CLAUDE_PLUGIN_ROOT` (plugin path) **or** `CLAUDE_PROJECT_DIR` (the `npx … init` project install) set, and `COPILOT_CLI` unset → `{ "hookSpecificOutput": ... }` (Claude Code)
 - `COPILOT_CLI=1` → `{ "additionalContext": ... }` (SDK standard)
+- `COPILOT_CLI=1` **but** the stdin payload carries `hook_event_name` → the
+  `hookSpecificOutput` shape. VS Code's native chat loop runs the same
+  `.github/hooks` entries as the Copilot CLI (it maps `sessionStart` →
+  `SessionStart` itself) yet reads only the Claude shape; the CLI's payload is
+  camelCase (`sessionId`, `agentName`) and never has that field, so the payload
+  tells the two engines apart where the flag cannot (`apply_payload_dialect`).
 
 `agent-start` emits the `SubagentStart`/`hookSpecificOutput` variant on Claude
 Code and Codex, the top-level `additionalContext` variant on Copilot CLI, and raw

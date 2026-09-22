@@ -1029,12 +1029,17 @@ function installCoreHooks(targets) {
       // Workspace event casing is event-specific in VS Code (verified live):
       //   - sessionStart fires as camelCase (both CLI and VS Code) → camelCase entry.
       //   - SubagentStart fires as PascalCase in VS Code, but camelCase in the CLI →
-      //     ship BOTH. The CLI fires both but consumes only top-level additionalContext
-      //     (camelCase/COPILOT_CLI) and ignores the PascalCase entry's hookSpecificOutput,
-      //     so no double-injection; VS Code fires only the PascalCase one. Without the
-      //     PascalCase SubagentStart, dispatched workers get NO memory in VS Code.
+      //     ship BOTH. Neither engine runs both: the CLI's PascalCase→camelCase table
+      //     (SessionStart, Stop, SubagentStop, …) has no SubagentStart, so the PascalCase
+      //     entry is inert there; VS Code's github-copilot dialect table maps every
+      //     camelCase event EXCEPT subagentStart, so only the PascalCase one runs there
+      //     (verified in Copilot CLI 1.0.7x app.js and VS Code 1.137 workbench). Without
+      //     the PascalCase SubagentStart, dispatched workers get NO memory in VS Code.
       // Each entry's env flag selects the emit shape in lib.sh (COPILOT_CLI → top-level
-      // additionalContext; SDLC_VSCODE → hookSpecificOutput).
+      // additionalContext; SDLC_VSCODE → hookSpecificOutput). The sessionStart entry is
+      // run by BOTH engines (VS Code maps it to SessionStart) and VS Code reads only the
+      // hookSpecificOutput shape, so lib.sh's apply_payload_dialect overrides the flag
+      // from the payload: `hook_event_name` present ⇒ VS Code shape.
       const cli = (verb) => ({
         type: "command",
         bash: `"./${rel}/run-hook.cmd" ${verb}`,
@@ -1042,9 +1047,14 @@ function installCoreHooks(targets) {
         env: { COPILOT_CLI: "1" },
         timeoutSec: 10,
       });
+      // bash/powershell, NOT `command`: VS Code maps bash → osx/linux and
+      // powershell → windows, and on Windows it runs the hook through PowerShell,
+      // where a bare quoted path is a string expression, not a call — the hook
+      // silently never ran there until someone hand-added the `&` call operator.
       const vscode = (verb) => ({
         type: "command",
-        command: `"./${rel}/run-hook.cmd" ${verb}`,
+        bash: `"./${rel}/run-hook.cmd" ${verb}`,
+        powershell: `& "./${rel}/run-hook.cmd" ${verb}`,
         env: { SDLC_VSCODE: "1" },
         timeout: 10,
       });
@@ -1731,12 +1741,16 @@ function injectCopilotSessionStartHook(agentText, name) {
   const fmBody = m[1];
   if (/^hooks:/m.test(fmBody)) return agentText; // author already defined hooks — leave it
   const rel = ".github/hooks/sdlc-skills";
+  // bash + powershell (not `command`): on Windows VS Code runs the hook via
+  // PowerShell, where a bare quoted path never executes — it needs the `&` call
+  // operator. VS Code maps bash → osx/linux, powershell → windows.
   const cmd = `"./${rel}/run-hook.cmd" agent-start ${name}`;
   const hooksYaml =
     `hooks:\n` +
     `  SessionStart:\n` +
     `    - type: command\n` +
-    `      command: '${cmd}'\n` +
+    `      bash: '${cmd}'\n` +
+    `      powershell: '& ${cmd}'\n` +
     `      env:\n` +
     `        SDLC_VSCODE: "1"\n` +
     `        SDLC_HOOK_EVENT: "SessionStart"\n` +
@@ -1854,6 +1868,18 @@ function flattenAgentForCopilot(src, name, targetDir, update, registry) {
     const soulDest = join(CWD, ".agents", "memory", name, "SOUL.md");
     mkdirSync(dirname(soulDest), { recursive: true });
     writeFileSync(soulDest, soul);
+  }
+
+  // RULES.md rides the same channel as SOUL.md: the agent-start hook reads
+  // `.agents/memory/<role>/RULES.md` first (hooks/lib.sh role_memory_files), so
+  // a Copilot dispatch gets the echo exactly like a Claude one. Before this the
+  // file was simply not installed on Copilot — every rule living only there
+  // silently vanished on that host.
+  const rulesFile = join(src, "RULES.md");
+  if (existsSync(rulesFile)) {
+    const rulesDest = join(CWD, ".agents", "memory", name, "RULES.md");
+    mkdirSync(dirname(rulesDest), { recursive: true });
+    writeFileSync(rulesDest, readFileSync(rulesFile, "utf8"));
   }
 
   return { status: "installed", dest };

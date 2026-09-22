@@ -328,6 +328,58 @@ test('SOUL.md is injected on Claude, not only under Copilot', () => {
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
 
+// --- Copilot dialect: one hooks-copilot.json entry, two engines ---------------
+// The COPILOT_CLI=1 entries are run by the Copilot CLI (reads top-level
+// additionalContext, camelCase payload) AND by VS Code's native chat loop (reads
+// only hookSpecificOutput, Claude-dialect payload with hook_event_name). The
+// payload, not the flag, decides the shape.
+test('COPILOT_CLI entry + CLI payload (agentName) → top-level additionalContext', () => {
+  const dir = project({ role: 'tech-lead', memory: { 'snapshot.md': 'cli snapshot' } });
+  try {
+    const out = execFileSync('bash', [HOOK], {
+      input: JSON.stringify({ sessionId: 's1', agentName: 'tech-lead' }),
+      env: { ...process.env, COPILOT_PROJECT_DIR: dir, COPILOT_CLI: '1' },
+      encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'],
+    });
+    const j = JSON.parse(out);
+    assert.match(j.additionalContext, /cli snapshot/);
+    assert.equal(j.hookSpecificOutput, undefined);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('COPILOT_CLI entry + VS Code payload (hook_event_name) → hookSpecificOutput', () => {
+  const dir = project({ role: 'tech-lead', memory: { 'snapshot.md': 'vscode snapshot' } });
+  try {
+    const out = execFileSync('bash', [HOOK], {
+      input: JSON.stringify({ hook_event_name: 'SubagentStart', agent_type: 'tech-lead', session_id: 's1' }),
+      env: { ...process.env, COPILOT_PROJECT_DIR: dir, COPILOT_CLI: '1' },
+      encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'],
+    });
+    const j = JSON.parse(out);
+    assert.equal(j.hookSpecificOutput.hookEventName, 'SubagentStart');
+    assert.match(j.hookSpecificOutput.additionalContext, /vscode snapshot/);
+    assert.equal(j.additionalContext, undefined);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('session-start: COPILOT_CLI entry answers in the shape the payload dialect implies', () => {
+  const dir = project({ role: 'tech-lead', memory: { 'MEMORY.md': index(4000) } }); // forces a <memory-budget> block
+  try {
+    const runWith = (input) => spawnSync('bash', [SESSION_HOOK], {
+      input: JSON.stringify(input),
+      env: { ...process.env, COPILOT_PROJECT_DIR: dir, COPILOT_CLI: '1' },
+      encoding: 'utf8',
+    }).stdout;
+    const cli = JSON.parse(runWith({ source: 'new', sessionId: 'nope', cwd: dir }));
+    assert.match(cli.additionalContext, /memory-budget/);
+    assert.equal(cli.hookSpecificOutput, undefined);
+    const vscode = JSON.parse(runWith({ hook_event_name: 'SessionStart', source: 'new', session_id: 'nope', cwd: dir }));
+    assert.equal(vscode.hookSpecificOutput.hookEventName, 'SessionStart');
+    assert.match(vscode.hookSpecificOutput.additionalContext, /memory-budget/);
+    assert.equal(vscode.additionalContext, undefined);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
 test('SOUL.md is still injected under Copilot', () => {
   const dir = project({ role: 'tech-lead', memory: { 'SOUL.md': 'I am Rio, and I block on flaws.' } });
   try {

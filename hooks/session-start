@@ -37,6 +37,9 @@ refresh_shared_instructions "$PROJECT_DIR"
 # Copilot CLI orchestrator. Bounded read — a plain `cat` can hang on runtimes that
 # leave the pipe open (see read_stdin_payload in lib.sh).
 payload="$(read_stdin_payload)"
+# VS Code's native chat loop runs the COPILOT_CLI=1 entry too but reads only the
+# Claude shape — the payload's `hook_event_name` tells it apart from the CLI.
+apply_payload_dialect "$payload"
 
 # The Copilot CLI launches the main agent via `--agent <name>` and records it as the
 # first `subagent.selected` event in its session-state log; resolve it so the CLI
