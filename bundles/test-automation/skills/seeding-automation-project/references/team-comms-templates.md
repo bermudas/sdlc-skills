@@ -133,7 +133,7 @@ steps in the same reply.
 ## Setup
 
 - **Host:** GitHub Copilot (`.github/agents/`).
-- **Dispatch:** host-native subagents via prose-driven `agent` tool invocation.
+- **Dispatch:** a structured tool call — `task` (`agent_type`) on the Copilot CLI, `runSubagent` (`agentName`) in VS Code Copilot Chat. Prose never dispatches.
 - **Installed personas:** <N> — see the roster below.
 
 ## Team roster
@@ -149,52 +149,49 @@ Use the agent name exactly as it appears in the file's YAML frontmatter.
 
 ## How to hand off work (GitHub Copilot)
 
-Copilot routes subagent calls through a built-in `agent` tool, but the
-invocation is **prose-driven, not a structured call**. You write "Use the
-`<name>` agent to …" in your response body, and the Copilot runtime
-recognizes the pattern and dispatches under the hood.
+A subagent is dispatched by **calling a tool**, never by writing prose. The
+runtime does not read your reply for instructions — "Use the engineer agent
+to …" dispatches nothing. Which tool depends on the engine you are running in:
 
-**Three Copilot-specific facts you must know:**
+| Engine | Tool | Arguments |
+|---|---|---|
+| **Copilot CLI** (terminal, and the "Copilot CLI" sessions inside VS Code) | `task` | `agent_type: "<agent name>"`, `description` (3–5 words), `prompt` |
+| **VS Code Copilot Chat** (the default chat view) | `runSubagent` | `agentName: "<agent name>"`, `description`, `prompt` |
 
-1. **Frontmatter capability is required.** Every agent that spawns
-   subagents must declare the capability in its YAML frontmatter:
+The agent name is the `name:` from the agent file's frontmatter (roster
+above). On the CLI every installed custom agent is also exposed as a tool
+under its own name (`test-automation-engineer` with `description` + `prompt`)
+— either form works. The call blocks until the subagent finishes and its
+final message comes back as the tool result in the same turn; there is no
+queue, no background mode and no notification.
 
-       tools: ['agent', ...existing tools...]
-       agents: ['test-automation-lead', 'test-automation-engineer', 'scout']
+**No frontmatter is needed for this.** Custom agents are invocable by the
+model by default on both engines. Never add a `tools:` key to an agent file:
+on the CLI it is an allow-list, and `tools: ['agent']` strips the agent of
+read, edit and execute. An `agents:` list only narrows which subagents an
+agent may call in VS Code; leave it out.
 
-   The `agents:` list is a whitelist of names this agent is allowed to
-   spawn. Scout wires this in at seed time.
+**Single subagent** — one tool call:
 
-2. **Invocation is prose.** The runtime pattern-matches on your reply.
-   Write it as an instruction, not as a function call.
-   - Correct: "Use the test-automation-engineer agent to automate TC-101 from tasks/auth/TC-101_login.md per the test-automation-workflow skill and return the IMPL result."
-   - Correct: "Have the Scout agent map the auth module and report in under 200 words."
-   - Wrong: "Delegate the research step." (too vague — won't trigger)
-   - Wrong: `Agent(subagent_type="test-automation-engineer", prompt="…")` (Claude-only syntax — Copilot prints it as plain text)
+```
+task { agent_type: "test-automation-engineer",
+       description: "Build TC-101",
+       prompt: "Builder: automate TC-101 from tasks/auth/TC-101_login.md. Route: combined.
+                Branch: automation/TC-101-login. Read .agents/testing.md first.
+                Nothing wakes you — run in the foreground or wait with sleep polls.
+                Exit with the Run Report." }
+```
 
-3. **`handoffs:` is user-driven, not programmatic.** Copilot's
-   `handoffs:` frontmatter renders as buttons the user clicks to continue
-   the conversation in another agent. Use it for "what should happen
-   next" after you finish. Use prose-driven invocation when *you* need a
-   subagent's output mid-run. The two are not interchangeable.
+(`runSubagent { agentName: "test-automation-engineer", description, prompt }` in
+VS Code Copilot Chat.)
 
-**Single subagent (what you actually write in your reply):**
+**Several subagents** — several tool calls in the **same reply**, only for
+read-only work on a finished diff (reviewers). Nothing that writes runs
+concurrently: one working tree has one state at a time.
 
-> Use the `test-automation-engineer` agent to automate TC-101 from
-> tasks/auth/TC-101_login.md per the test-automation-workflow skill.
-> Context: <paste relevant facts>. Branch: tests/TC-101-login. Return
-> the IMPL result.
-
-**Parallel subagents — list them in the same reply:**
-
-> Use the `scout` agent to map the auth module and report files, entry
-> points, and tech-debt in under 200 words.
->
-> Use the `test-automation-engineer` agent to assess TC-102 per the
-> automation-scoping skill and return the verdict.
-
-Both trigger the Copilot `agent` tool and run to completion; both
-results land back in your next turn.
+**`handoffs:` is user-driven, not programmatic.** It renders as buttons the
+user clicks to continue in another agent after you finish. It never replaces
+a mid-run dispatch.
 
 ## When to hand off vs. do it yourself
 
@@ -222,10 +219,12 @@ off.
 ## Anti-patterns
 
 - **Don't hand off trivially.** One grep and one edit away? Do it.
-- **Don't hand off to a persona not in your `agents:` whitelist.** The
-  runtime will refuse — check your frontmatter.
-- **Don't use Claude-style structured calls.** `Agent(...)` prints as
-  text under Copilot. Use the prose pattern.
+- **Don't dispatch in prose.** "Use the engineer agent to …" in your reply
+  runs nothing on either engine — call `task` / `runSubagent`.
+- **Don't use Claude-style calls.** `Agent(...)` prints as text under
+  Copilot; the tool is `task` (CLI) or `runSubagent` (VS Code).
+- **Don't edit agent frontmatter to "enable" dispatch.** Nothing needs
+  enabling, and a `tools:` key on the CLI takes tools away.
 - **Don't confuse `handoffs:` with in-run subagent calls.** `handoffs:`
   is post-run navigation; subagent calls are mid-run delegation.
 - **Don't hand off and discard.** The subagent's result belongs in your

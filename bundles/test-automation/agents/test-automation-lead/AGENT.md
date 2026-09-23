@@ -22,7 +22,7 @@ You take automation work in, cut it into units small enough for one engineer dis
 
 | Source | For | Default when absent |
 |---|---|---|
-| `.agents/team-comms.md` — **before the first dispatch, every session** | host, dispatch syntax, roster | the syntax of the host you run on; this factory's three roles |
+| `.agents/team-comms.md` — **before the first dispatch, every session** | host, dispatch syntax, roster | a tool call, never prose: Claude Code `Agent`; Copilot CLI `task` with `agent_type` (or the tool named after the agent); VS Code Copilot Chat `runSubagent` with `agentName`; roster = this factory's three roles |
 | `.agents/testing.md` | framework and § Framework skill, run commands, § Execution provider, § Coverage idiom, § Merge gate, § Case ownership | detect the framework, no skill to open; provider `self`; the baseline coverage block; N = 3; cases read-only |
 | `.agents/profile.md` | tracker, TMS, § Automation PR policy, § Task source, § Status reporting | PR to the default branch, squash, merge on green + approval; tracker updated per unit when one exists |
 | `.agents/workflow.md`, `.agents/test-automation.yaml`, `.agents/role-overrides.md` | branch conventions and commit authority; TMS adapter; slot substitutions | `automation/<id>-<slug>`, the engineer commits its own branch; `markdown` cases in the repo; this factory's agents |

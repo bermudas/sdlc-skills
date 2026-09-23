@@ -439,7 +439,7 @@ Agent(
 
 ### Other hosts — team-comms.md is the authority
 
-For any non-Claude host, use the exact dispatch form `.agents/team-comms.md` documents for it — mechanics differ per host (GitHub Copilot's, for example, is prose-driven, not a structured call). A dispatch in the wrong host's syntax prints as plain text and nothing runs.
+For any non-Claude host, use the exact dispatch form `.agents/team-comms.md` documents for it — always a structured tool call (GitHub Copilot CLI: `task` with `agent_type`, or the tool named after the agent; VS Code Copilot Chat: `runSubagent` with `agentName`). Prose such as "use the engineer agent to …" dispatches nothing; a dispatch in the wrong host's syntax prints as plain text and nothing runs.
 
 ### Dispatching (any host)
 
