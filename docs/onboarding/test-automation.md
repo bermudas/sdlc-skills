@@ -143,8 +143,14 @@ copilot --agent test-automation-lead --yolo
 
 # Non-interactive (CI, a scripted batch): -p implies no prompts, so at minimum
 # --allow-all-tools is REQUIRED or the run dies at the first confirmation.
+# AND prompt mode loads the repo's .github/hooks (agent memory, project
+# context, persona) ONLY when the folder is trusted or an opt-in env var is
+# set — the flags alone do not count (verified on 1.0.88; the skip is silent):
+GITHUB_COPILOT_PROMPT_MODE_REPO_HOOKS=true \
 copilot --agent test-automation-lead --allow-all-tools \
   -p "Automate TC-1234, TC-1235, TC-1236."
+# Alternatives: COPILOT_ALLOW_ALL=true (also implies --allow-all-tools), or run
+# `copilot` interactively in the repo once and confirm folder trust.
 
 # Only when the project's MCP servers need auth headers the repo-root .mcp.json
 # can't carry (see below) — relocate the config dir to the repo-local one:
@@ -209,6 +215,8 @@ Flags worth knowing, confirmed against 1.0.63:
 |---|---|
 | `--yolo` / `--allow-all` | identical: `--allow-all-tools --allow-all-paths --allow-all-urls` |
 | `--allow-all-tools` | tools run without confirmation; **required for `-p`** (env: `COPILOT_ALLOW_ALL`) |
+| `GITHUB_COPILOT_PROMPT_MODE_REPO_HOOKS=true` (env) | **required for `-p` to load `.github/hooks`** unless the folder is trusted or `COPILOT_ALLOW_ALL=true`; no CLI flag does this (1.0.88) |
+| folder trust | confirmed once in an interactive session, stored as `trusted_folders` in `~/.copilot/config.json`; subfolders inherit it |
 | `--mode <interactive\|plan\|autopilot>` | initial agent mode; `--autopilot` is shorthand for the third |
 | `--add-dir <dir>` | widen file access beyond the workspace |
 | `--allow-tool` / `--deny-tool` | per-tool allow/deny when `--yolo` is too broad |

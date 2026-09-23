@@ -130,8 +130,14 @@ claude --agent test-automation-lead  # Phase 2+ — drive every automation task
 GitHub Copilot CLI finds the same agents in `.github/agents/` on its own, and
 reads the repo-root `.mcp.json` as workspace servers — no extra wiring. Add
 `--yolo` (or at least `--allow-all-tools`), or an orchestrator that dispatches
-subagents stalls on every confirmation. In the VS Code extension, pick the
-agent in the chat panel and switch the session to auto-approve/bypass first.
+subagents stalls on every confirmation. **Non-interactive `-p` runs load the
+repo's `.github/hooks` — and with them every agent's memory and project
+context — only when the folder is trusted or an opt-in env var is set:**
+`GITHUB_COPILOT_PROMPT_MODE_REPO_HOOKS=true` (or `COPILOT_ALLOW_ALL=true`), or
+confirm folder trust once in an interactive `copilot` session. The CLI flags
+do not count; without the opt-in the hooks are skipped silently (only a
+`--log-level debug` line says so). In the VS Code extension, pick the agent in
+the chat panel and switch the session to auto-approve/bypass first.
 Full per-host detail: [onboarding § Launching the agents](../../docs/onboarding/test-automation.md#launching-the-agents--run-them-as-your-main-agent).
 
 **Before Phase 1 — two prerequisites.** scout's tool-wiring inspects the

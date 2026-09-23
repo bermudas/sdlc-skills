@@ -74,7 +74,7 @@ relied on, so the hooks are safe on an unseeded project.
 |---|---|---|---|---|
 | **Claude Code** | ✅ `SubagentStart` (`agent_name`) → `agent-start` | ✅ `SessionStart` → `session-start` | ✅ (`startup\|clear\|compact\|resume`) | auto: `hooks/hooks.json` at plugin root |
 | **Codex** | ✅ `SubagentStart` (`agent_type`), same shape as CC | ✅ `SessionStart` | ✅ (`startup\|resume\|clear\|compact`) | `~/.codex/hooks.json` or `<repo>/.codex/hooks.json` |
-| **Copilot CLI** | ✅ `subagentStart` (`agentName`) → `agent-start` | ✅ `sessionStart` (v1.0.11+ honours `additionalContext`) | ✅ on resume | `.github/hooks/*.json` or `~/.copilot/hooks/` |
+| **Copilot CLI** | ✅ `subagentStart` (`agentName`) → `agent-start` | ✅ `sessionStart` (v1.0.11+ honours `additionalContext`) | ✅ on resume | `.github/hooks/*.json` or `~/.copilot/hooks/` — **in `-p` mode repo hooks load only for a trusted folder or with `GITHUB_COPILOT_PROMPT_MODE_REPO_HOOKS=true` / `COPILOT_ALLOW_ALL=true`** (1.0.88; flags do not count, the skip is silent) |
 | **Cursor** | ❌ `subagentStart` is permission-only (no context inject; generic `subagent_type`) → roster reminder + `memory` skill | ✅ `sessionStart` | ✅ (`sessionStart` re-fires; `preCompact` exists) | `.cursor/hooks.json` |
 | **Kiro** | ⚠️ `agentSpawn` carries no agent name → per-agent config passes the role explicitly | ✅ via `agentSpawn` (raw stdout) | n/a (per-spawn) | inside each custom-agent config `hooks` field |
 
@@ -101,6 +101,12 @@ scheme superpowers uses), so one script serves every runtime:
   `SessionStart` itself) yet reads only the Claude shape; the CLI's payload is
   camelCase (`sessionId`, `agentName`) and never has that field, so the payload
   tells the two engines apart where the flag cannot (`apply_payload_dialect`).
+  VS Code (1.137) gates workspace hooks on **Workspace Trust**: in Restricted
+  Mode every `.github/hooks` file is skipped (reason `workspace-untrusted`,
+  visible only in the Chat customizations view — no prompt in chat), and
+  `chat.useHooks` (default on) or the `chat.hooks.allowManagedOnly` policy can
+  turn them off entirely. Hook files themselves sit on the edit auto-approve
+  exclusion list, so an agent editing `.github/hooks/**` always asks.
 
 `agent-start` emits the `SubagentStart`/`hookSpecificOutput` variant on Claude
 Code and Codex, the top-level `additionalContext` variant on Copilot CLI, and raw

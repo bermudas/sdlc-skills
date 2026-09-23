@@ -71,10 +71,10 @@ note at the top telling each runtime which section applies.
 
 This sub-step only runs when `have_copilot=1`, and it **writes nothing new**.
 
-Custom agents are invocable by the model by default on both Copilot engines:
-the CLI exposes every installed agent through the `task` tool (`agent_type`)
-and as a tool under its own name; VS Code Copilot Chat exposes them through
-`runSubagent` (`agentName`). No capability declaration exists or is needed.
+Custom agents are invocable by the model by default on every Copilot engine
+through its own subagent tool; the agent sees that tool in its tool list. No
+capability declaration exists or is needed, and the template deliberately
+names no tool — the model already knows its host's.
 
 What scout does check, per file under `.github/agents/`:
 
