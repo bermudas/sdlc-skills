@@ -37,7 +37,6 @@ Workflow({
     //                                        test-automation-engineer for the other three
     // workerModel / workerEffort           — builder default: inherit session
     // reviewerModel: null                  — frontmatter governs (no floor); override per run,
-    //                                        or use reviewPanel for stakes
     // triageModel: "haiku"                 — the read-only evidence-check dispatch's model
     // quotaResume: false                   — set true ONLY when resuming after an account-ceiling halt
     // fixRounds: 8                         — runaway backstop for the review/fix loop, not the control
@@ -49,7 +48,6 @@ Workflow({
     // gateCmd: null                        — suite command; null → the gate agent resolves it from .agents/testing.md
     // integrationBranch: "tests/batch-<slug>"
     // skipGate: false                      — true = stop after the last unit merges, no gate
-    // reviewPanel: false                   — true = 3-lens static review panel, unanimous to approve
     // breakerThreshold: 3                  — consecutive same-cause parks that halt the front
     // budgetReserve: 60000                 — stop admitting cases when budget.remaining() drops below this
   }
@@ -120,7 +118,7 @@ a builder wants its own. Nothing reconciles that except ordering.
 | Report writer | once, at the end |
 
 The **only** sanctioned fan-out is read-only: several reviewers on one *finished*
-diff (the opt-in `reviewPanel`), writing nothing, while no writer runs.
+diff, writing nothing, while no writer runs — a hand-run option; the shipped build script dispatches one reviewer.
 
 Why — with the field numbers (eight checkout aborts, 90 conflict hits, three
 git-surgery rescues in one session) and what serialising buys back in agent
@@ -277,7 +275,7 @@ see § Campaigns below.
   totals: {delivered, blocked, …},
   gate: {verdict, runs, seconds, failures[]},
   integration_branch, quality_flags, quota_halted,
-  report_written, report_path, extend_cases, next }
+  report_written, report_path, expected_red, parked, next }
 ```
 
 `cases` is the whole story: one row per input case, its outcome, its coverage
@@ -291,7 +289,7 @@ rather than skipping:
   batch's coverage.
 - **`quota_halted`** — the run stopped on an account ceiling with nothing to
   repair. Remaining cases are `not-started`.
-- **`extend_cases`** — feeds your extend audit.
+- **`expected_red`** — tests left red on a ticketed product defect (their cases are `defect-found`, the trunk carries them; landing decides allow-red-on-base vs a declared skip with the ticket). **`parked`** — units reviewed but not merged (semantic conflict), `blocked` in `cases[]` too.
 
 Then you merge the `delivered` cases, route the findings, and replan
 everything else (playbook § The loop → Close).
@@ -424,6 +422,26 @@ prose. Keep these if you ever fork it:
    what makes the harness's blind retries incremental instead of 11×
    from-scratch.
 
+8. **Cards, not manuals (2026-09-29).** A dispatch prompt is the unit's facts
+   plus the return contract — case paths, route and evidence, trunk and branch,
+   N, the schema's semantics — and nothing the agent's own AGENT.md already
+   says. Restating the locator ladder, the coverage grammar, the masking
+   catalogue and context economy in the script was half its volume and drifted
+   from the bodies (it still told workers memory was gitignored after the
+   decision to commit it by path). What moved out with the trim: the automatic
+   **carve/quarantine** of a stuck subset (the loop now returns the unit
+   `blocked` naming the stuck cases; splitting is the lead's decision, playbook
+   § The loop), the **review panel** (`reviewPanel` — fan reviewers out by hand
+   when the stakes warrant), and the gate's run shape (now `commands.md
+   § Hardening gate`, read by the gate slot). What the script still encodes,
+   because no agent can know it: the trunk discipline (WHY NO BOARD — the
+   journal, git and the report are the state, a hand-kept board drifted 4 of 12
+   cases in one campaign; OUTCOMES, NOT STATUSES — a closed vocabulary plus the
+   in-flight markers `built`/`reviewed` and `merged-ungated` for a trunk the
+   gate never proved; THROUGHPUT FROM CLUSTERING — units are the wall clock),
+   prompt determinism, the guards (quota ceiling, breaker, stalls) and the
+   `expected_red` mechanics.
+
 ## Hooks & memory (verified 2026-07-20)
 
 `SubagentStart` hooks DO fire for workflow-spawned agents, and the payload
@@ -486,11 +504,7 @@ timestamps at all — the report writer and git supply them.
   `--apply`. **A branch goes only when a merged PR names it** — the report
   contributes the names, the PR state is the authority, and "cannot tell"
   (no `gh`) authorizes nothing.
-- **`reviewPanel: true`** — turns the static review into the tool's
-  perspective-diverse verify pattern: three reviewers with distinct lenses
-  (correctness / honesty-of-coverage / maintainability), unanimous APPROVED to
-  pass. ~2 extra reviewer dispatches per case; use for large or high-stakes
-  batches or a new builder configuration.
+
 - **`budget`** — if the operator sets a token target ("+500k"), the script
   hard-stops admitting new cases when `budget.remaining()` falls below
   `budgetReserve` and leaves the rest `not-started`. No target → no limit.
@@ -566,7 +580,7 @@ clock, so grouping similar cases is the main lever a flat batch has.
 The shipped scripts are **defaults, not a cage** — but changes have a
 gradient, and each step up needs more care:
 
-1. **Args first.** Model/effort tiers, review panel, breaker, clusters, gate N,
+1. **Args first.** Model/effort tiers, breaker, clusters, gate N,
    fix rounds, even `agentTypes` substitution — if the need fits an existing
    knob, turn the knob.
 2. **Plan next.** New stages usually aren't new code: a compliance sign-off,

@@ -10,6 +10,7 @@
 - [Phase 6: Deliver + TMS sync](#phase-6-deliver-tms-sync)
 - [Sub-agent result collection pattern (cross-host)](#sub-agent-result-collection-pattern-cross-host)
 - [Evidence paths (convention)](#evidence-paths-convention)
+- [Hardening gate — run shape](#hardening-gate--run-shape)
 
 Concrete commands for each phase. Load this file when you need the
 copy-pasteable template; the main `SKILL.md` has the conceptual flow.
@@ -325,3 +326,55 @@ extend the same tree for CI artifacts. The artifact *kinds* follow the
 surface — `screenshots/` for UI, request/response captures or `json/`
 transcripts for API, metric summaries for perf — but the tree and the
 `reports/` + `json/` + `unsynced/` layout stay the same.
+
+## Hardening gate — run shape
+
+The gate slot proves a batch trunk before it goes to base. It fixes nothing and
+classifies nothing; it runs and reports. Mechanics are scripted in
+`scripts/gate/gate-case.mjs` (fetches, checks the branch out here, merges base
+FIRST, runs the suite command N times with timings, refuses only dirt on the
+files it proves). It REQUIRES `--branch`, `--base` and `--cmd` — resolve the
+suite command from `.agents/testing.md § Run commands` and pass it with a
+`{spec}` placeholder.
+
+**One run per call.** `--n 1`, in the foreground, with `timeout: 600000`,
+repeated N times, counting the consecutive greens yourself. Do NOT pass
+`--n <N>`: all N runs then share one process, a real UI batch exceeds the 600 s
+ceiling a foreground call has, and the call is killed mid-run. If ONE run does
+not fit under ~8 minutes, launch it detached with `--json` to a file and wait
+with blocking `sleep 300; <check the file>` polls, one per call. Never end a
+turn while a run is in flight, never poll every few seconds.
+
+**The mechanical coverage check first.** On the FIRST call add
+`--cases <id,id,…>` (the batch's case ids): a coverage line per case id in the
+changed specs, exclusion grammar parses, categories from the closed vocabulary.
+A `coverage-invalid` verdict is a red for the batch — report each problem
+verbatim, stop, do not burn N runs proving code whose contract is broken. Set
+`coverage_checked=true` only when this check actually ran under your gate (a
+recorded `coverage: ok` for the branch in `gate-runs.jsonl` counts on a resume).
+
+**Two proofs, two counts.** The batch's own specs run N× — repetition is what
+catches a flake. Everything else was already proven, so it runs ONCE, scoped by
+blast radius: read the non-spec diff (`git diff <base>...<trunk>` — page
+objects, fixtures, helpers, config) hunk by hunk. A hunk that only ADDS (a new
+method, locator, constant nothing existing calls) has no blast radius. A hunk
+that MODIFIES or deletes something that existed names an impacted symbol; the
+impacted specs are the ones that reach it — by symbol name, one hop through
+shared helpers — NEVER every spec importing the file (import-level selection
+has over-run 5–10× live). Run that set once, selected by node-id, never by
+directory. All hunks additive → say so in notes and skip the run. A modified
+symbol in a base class everything reaches makes the set real: report its size
+and estimated runtime and let the lead decide run-vs-sample.
+
+**A red anywhere ends the attempt** — N consecutive is the contract, not
+best-of-N. On red, read the runner's structured report for per-spec verdicts and
+return one `failures[]` entry per failing spec (spec, signature, case ids). Say
+in notes when a spec never ran at all (module not found, worker crash, 0 ms
+duration, collection error) — that is an infrastructure fact, not a red case.
+
+**Cut off mid-run?** Verdict `incomplete`, not `not-run`: `runs` = the greens
+already banked, `green_specs` listed, notes saying where to resume. A resumable
+gate is worth far more to the lead than a blank one.
+
+When done, leave the tree on the trunk (`git checkout <trunk>` after the
+script's detached run).

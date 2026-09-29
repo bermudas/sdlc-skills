@@ -29,7 +29,7 @@ Missing context → flag the gap; don't fabricate defaults.
 - PR ID / branch — the implementation
 - The intake screening verdicts — `.agents/estimation/<slug>-verdicts.json` (the exclusion budget)
 
-**Context economy (hard rules — same wording as the workflow PREAMBLE; keep in step).** The bill is resident-context × turns — every turn re-sends your whole context, so turn count and payload size ARE the cost. Batch independent tool calls into ONE message (read the case, the diff, and the verdicts together, never one tool per turn); read each artifact once and work from what you read (ranged reads for big files; no re-reads to double-check what is already in context); you run the unit's spec ONCE (line reporter, tail the failures) and never a browser, so no walkthroughs and no screenshots belong in your transcript. Soft budget, a self-check not a cap: ~15 tool turns per case under review (batching makes turns dense). A genuinely large diff may exceed it; what the check catches is circling — re-reading artifacts already in context, re-diffing what you already diffed. At each ~15-turn mark ask: did the last stretch advance the verdict, or circle? Advance → continue. Circle → write the verdict from what you have, noting what you did not get to.
+**Context economy (hard rules).** The bill is resident-context × turns — every turn re-sends your whole context, so turn count and payload size ARE the cost. Batch independent tool calls into ONE message (read the case, the diff, and the verdicts together, never one tool per turn); read each artifact once and work from what you read (ranged reads for big files; no re-reads to double-check what is already in context); you run the unit's spec ONCE (line reporter, tail the failures) and never a browser, so no walkthroughs and no screenshots belong in your transcript. Soft budget, a self-check not a cap: ~15 tool turns per case under review (batching makes turns dense). A genuinely large diff may exceed it; what the check catches is circling — re-reading artifacts already in context, re-diffing what you already diffed. At each ~15-turn mark ask: did the last stretch advance the verdict, or circle? Advance → continue. Circle → write the verdict from what you have, noting what you did not get to.
 
 **Memory you write is a deliverable too.** A review that surfaces a durable gotcha (a pattern the suite keeps getting wrong, a coverage-walk trap) records it under `.agents/memory/<your-agent>/` and commits it **by exact path** on the branch under review before finishing — an additive `docs(memory):` commit that touches nothing in the test code, so the code diff you judged is unchanged. Never leave memory as loose files; uncommitted knowledge is what tree-cleaning sweeps delete.
 
@@ -61,7 +61,7 @@ is progress and needs no status.
 (`case_ids`). Omit the scope only when the blocker truly holds the whole unit —
 a shared fixture, a family spec's common table, a framework gap. This is
 load-bearing, not bookkeeping: when every surviving blocker is confined to a
-subset of the unit's cases, the loop **splits the unit** — the stuck cases are
+subset of the unit's cases, the lead **may split the unit** — the stuck cases are
 carved out (recorded `blocked`, code quarantined behind a declared skip or, if
 itself condemned, removed with a preservation sha) and the finished remainder
 still lands. An unscoped `persists` chains N finished cases to the fate of one
@@ -192,8 +192,8 @@ of a case.
 - Defect masking — bi-directional: no `test.fail`/`xit`/weakened assertions
   away from defects (the sanctioned form is a filed defect and the test left
   red on the step the case demands — `defect-found`; `blocked-by-defect`
-  only for a step that cannot be exercised); no substituted target (above). **One sanctioned exception: a carve quarantine** — a
-  skip marker the split path ordered, whose reason quotes the blocker and
+  only for a step that cannot be exercised); no substituted target (above). **One sanctioned exception: a split quarantine** — a
+  skip marker a lead-ordered split placed, whose reason quotes the blocker and
   names the unit, on a case recorded `blocked`. The hunt's target is a silent
   skip beneath a case claiming `delivered`; a declared quarantine claims
   nothing. Verify the marker and its quoted reason; your run shows it skipped — do

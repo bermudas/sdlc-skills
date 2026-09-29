@@ -72,25 +72,16 @@ const quote = (s, max = 400) => String(s ?? '')
   .trim()
   .slice(0, max)
 
-// Kept in step with batch-build.workflow.mjs's FOREGROUND_RULE — same measured
-// facts (28ms enforcement on a turn end; blocking sleep works; 600s call cap).
+// Kept in step with batch-build.workflow.mjs's FOREGROUND_RULE — the same three
+// harness facts (600s call cap; a turn that ends is reported 28ms later, nothing
+// wakes it; blocking sleep is the legal wait).
 const FOREGROUND_RULE =
-  'LONG JOBS — test suites especially. A foreground call is killed at its `timeout` ' +
-  '(default 120s, MAXIMUM 600000ms), so ALWAYS pass timeout: 600000 on a suite run, ' +
-  'and let the call block when the job fits inside it. ' +
-  'When the job does NOT fit in one call: launch it detached, writing its output to a file, ' +
-  'then WAIT with blocking foreground polls — ONE `sleep <n>; <tail the output file>` per call, each with ' +
-  'timeout: 600000 — until it is done. Sleeping in the foreground is legal and cheap: it is ONE turn ' +
-  'however long you sleep. Make the FIRST poll short (~60-120s) — a run that dies in its first minute ' +
-  'must not cost a five-minute blind sleep — then settle at ~`sleep 300`. NEVER chain sleeps inside one ' +
-  'call (`sleep 120; tail; sleep 240; tail`): the chain outlives the call cap and is killed at its own ' +
-  'timeout, taking the tail you already read with it — one sleep, one look, return, repeat. ' +
-  'NEVER end a turn while a job is running — nothing will wake you (measured: you are forced to ' +
-  'report 28ms later, before the job finishes, and neither run_in_background nor Monitor beats that), ' +
-  'this workflow blocks on your return, and your silence is indistinguishable from thinking. ' +
-  'NEVER poll at second-level intervals either — you pay a full context per turn, and a busy-wait ' +
-  'exhausts your turn budget and gets you cut off mid-job. ' +
-  'If a job is too long even for sleep-polling, say so and run the narrower selection you actually need. '
+  'LONG JOBS: a foreground call is killed at its `timeout` (default 120s, max 600000ms) — pass timeout: 600000 on a suite run ' +
+  'and let it block when the job fits. When it does not fit: run it detached to a file and wait with blocking polls, ONE ' +
+  '`sleep <n>; <tail the file>` per call (first poll ~60-120s, then `sleep 300`), never chaining sleeps in one call. ' +
+  'NEVER end a turn while a job is running — nothing will wake you and this workflow blocks on your return; ' +
+  'NEVER poll at second-level intervals — every turn re-sends your whole context. ' +
+  'A job too long even for that: say so and run the narrower selection you need. '
 
 // Stall-retry exhaustion THROWS out of agent() ("agent stalled on all N
 // attempts") instead of returning null — measured 2026-08-17 on a
@@ -344,7 +335,7 @@ if (F && A.foundationMerged !== true) {
     return { stage: 'foundation', status: 'blocked', detail: built?.notes ?? 'foundation implementer failed', next: 'Unblock the foundation (or set plan.foundation=null) and re-invoke with { plan }.' }
   }
   const reviewFoundation = (fixNote) => guarded('foundation review', () => agent(
-    `STATIC review of the foundation branch ${built.branch} (PR ${built.pr ?? 'n/a'}) per .claude/skills/test-automation-workflow/references/reviewer-contract.md — page objects/fixtures + one smoke spec, no case coverage to triangulate: judge structure, naming vs .agents/testing.md conventions, no defect masking in the smoke, scaffold-minimal (no unsolicited integrations). Read the diff via git diff ${plan.base}...${built.branch}; do NOT execute anything. ` +
+    `Review of the foundation branch ${built.branch} (PR ${built.pr ?? 'n/a'}) per .claude/skills/test-automation-workflow/references/reviewer-contract.md — page objects/fixtures + one smoke spec, no case coverage to triangulate: judge structure, naming vs .agents/testing.md conventions, no defect masking in the smoke, scaffold-minimal (no unsolicited integrations). Read the diff via git diff ${plan.base}...${built.branch} and run the smoke spec ONCE in a clean process; you fix nothing and edit nothing on the branch. ` +
     'blocking[] is what must change before this can land; anything else worth saying goes in findings[]. ' +
     (fixNote
       ? `\n\nThis is the re-review after a fix round. Prior blocking findings:\n${fixNote}\n` +
