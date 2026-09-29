@@ -344,7 +344,7 @@ if (F && A.foundationMerged !== true) {
     return { stage: 'foundation', status: 'blocked', detail: built?.notes ?? 'foundation implementer failed', next: 'Unblock the foundation (or set plan.foundation=null) and re-invoke with { plan }.' }
   }
   const reviewFoundation = (fixNote) => guarded('foundation review', () => agent(
-    `STATIC review of the foundation branch ${built.branch} (PR ${built.pr ?? 'n/a'}) per references/reviewer-contract.md — page objects/fixtures + one smoke spec, no case coverage to triangulate: judge structure, naming vs .agents/testing.md conventions, no defect masking in the smoke, scaffold-minimal (no unsolicited integrations). Read the diff via git diff ${plan.base}...${built.branch}; do NOT execute anything. ` +
+    `STATIC review of the foundation branch ${built.branch} (PR ${built.pr ?? 'n/a'}) per .claude/skills/test-automation-workflow/references/reviewer-contract.md — page objects/fixtures + one smoke spec, no case coverage to triangulate: judge structure, naming vs .agents/testing.md conventions, no defect masking in the smoke, scaffold-minimal (no unsolicited integrations). Read the diff via git diff ${plan.base}...${built.branch}; do NOT execute anything. ` +
     'blocking[] is what must change before this can land; anything else worth saying goes in findings[]. ' +
     (fixNote
       ? `\n\nThis is the re-review after a fix round. Prior blocking findings:\n${fixNote}\n` +

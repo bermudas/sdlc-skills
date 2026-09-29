@@ -28,12 +28,13 @@ type: project
   asserted or excluded with a closed-vocabulary category + verifiable referent
   (grammar in the implementation skill; idiom per `.agents/testing.md
   § Coverage idiom`). Free-text reasons block at review.
-- **No defect masking:** your AGENT.md § Hard Rules → 2 forbids
-  `test.fail()`, `xit()`, `@Ignore`, `pytest.skip()`, and weakened assertions for
-  product defects. A product defect is filed, then declared: step-isolated →
-  a `blocked-by-defect: <TICKET>` exclusion in the coverage block (spec stays
-  green, `coverage: partial`); case-blocking → let it fail, return
-  `defect-found`. `expect.soft()` only where the seed asks for a visible red.
+- **No defect masking:** your AGENT.md Rule 2 forbids `test.fail()`, `xit()`,
+  `@Ignore`, `pytest.skip()`, weakened assertions and re-aimed actions for
+  product defects. A product defect is filed, the case's assertion on that step
+  stays and fails, the remaining steps are written honestly, the unit returns
+  `defect-found` and its branch is parked until the fix ships. A
+  `blocked-by-defect: <TICKET>` exclusion is only for a step that cannot be
+  exercised at all.
 - **Stay on your unit branch.** Don't switch, rebase, or touch git history
   unless `.agents/workflow.md` grants you commit authority for this project.
 

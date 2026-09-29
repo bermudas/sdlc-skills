@@ -635,7 +635,8 @@ docs rather than restating them.
   code and test-runner dispatches point at the same target.
 
 ## Merge gate
-- **N:** <consecutive green runs the gate requires before a unit merges;
+- **N:** <consecutive green runs — the builder stabilises to N before
+  handoff and the batch gate requires N on the trunk before it goes to base;
   default 3 when absent — raise for suites with parallel-interaction
   flakes, never below 2>
 
@@ -738,10 +739,10 @@ docs rather than restating them.
 - **Gate N**: <number> — consecutive deterministic green runs the
   orchestrator requires at the batch hardening gate before merge.
   Default: 3.
-- **Reviewer live re-run**: <off | on> — `off` *(default)*: the reviewer
-  slot reviews statically (the hardening gate is the only independent
-  execution). `on`: the reviewer also executes the spec once — belt-and-
-  braces for teams that want a second runtime environment before the gate.
+- **Reviewer run**: <on | off> — `on` *(default)*: the reviewer walks the
+  case against the code and runs the unit's spec once in a clean process.
+  `off`: static review only — the batch gate is then the only independent
+  execution; use it only where the reviewer cannot run the suite.
 
 ## Batch pipeline
 - **Batch size M**: <number> — default cases per batch; `1` degenerates to

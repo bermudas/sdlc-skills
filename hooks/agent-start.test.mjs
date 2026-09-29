@@ -400,3 +400,56 @@ test('SOUL.md is found in the agent directory, not just the memory dir', () => {
     assert.match(out, /persona from the agent dir/);
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
+
+// Install locations. Field evidence (ta-bench, 2026-09-23): leads and engineers
+// ran `find / -maxdepth 6`, `ls ~/.claude/skills` and `find ~/.claude` hunting for
+// their own libraries and agent files — nothing in context said the directory.
+// The block names the absolute install dirs; a body rule alone did not stop the
+// first `find /` (5/5 probes), the injected path did (3/3).
+function withHostDir(dir, hostdir = '.claude') {
+  mkdirSync(join(dir, hostdir, 'skills', 'memory'), { recursive: true });
+  mkdirSync(join(dir, hostdir, 'agents', 'qa-engineer'), { recursive: true });
+  return dir;
+}
+
+test('install locations: a dispatched role gets the absolute skills/agents dirs and the no-search rule', () => {
+  const dir = withHostDir(project({ memory: { 'MEMORY.md': index(3) } }));
+  try {
+    const out = run(dir, 'qa-engineer');
+    assert.match(out, /Installed with you/);
+    assert.ok(out.includes(`${dir}/.claude/skills/<id>/`), 'absolute skills dir named');
+    assert.ok(out.includes(`${dir}/.claude/agents/`), 'absolute agents dir named');
+    assert.match(out, /never search \/ or ~/);
+    assert.ok(out.indexOf('Installed with you') < out.indexOf('Entry 0'), 'block comes before the memory');
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('install locations: every host dir present is listed, a bare project lists none', () => {
+  const both = withHostDir(withHostDir(project({ memory: { 'MEMORY.md': index(2) } })), '.github');
+  const bare = project({ memory: { 'MEMORY.md': index(2) } });
+  try {
+    const out = run(both, 'qa-engineer');
+    assert.ok(out.includes(`${both}/.claude/skills/<id>/`) && out.includes(`${both}/.github/skills/<id>/`));
+    const none = run(bare, 'qa-engineer');
+    assert.doesNotMatch(none, /Installed with you/);
+    assert.match(none, /Entry 0/);                  // memory still flows
+  } finally {
+    rmSync(both, { recursive: true, force: true });
+    rmSync(bare, { recursive: true, force: true });
+  }
+});
+
+test('install locations: session-start injects it for a --agent session, not for a plain one', () => {
+  const dir = withHostDir(project({ memory: { 'MEMORY.md': index(2) }, shared: { testing: '# testing' } }));
+  const session = (env) => spawnSync('bash', [SESSION_HOOK], {
+    input: JSON.stringify({ hook_event_name: 'SessionStart', source: 'startup' }),
+    env: { ...process.env, CLAUDE_PROJECT_DIR: dir, ...env },
+    encoding: 'utf8',
+  }).stdout ?? '';
+  try {
+    assert.match(session({ CLAUDE_CODE_AGENT: 'qa-engineer' }), /Installed with you/);
+    const plain = session({ CLAUDE_CODE_AGENT: '' });
+    assert.doesNotMatch(plain, /Installed with you/);
+    assert.match(plain, /testing/);                 // shared docs still injected
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});

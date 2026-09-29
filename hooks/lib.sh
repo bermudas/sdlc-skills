@@ -360,6 +360,37 @@ default_ctx_cap() {
   if [ -n "${COPILOT_CLI:-}" ] || [ -n "${SDLC_VSCODE:-}" ]; then printf '10240'; else printf '32768'; fi
 }
 
+# Where this role's own files live — the one fact an agent cannot derive: its
+# system prompt names libraries by id ("open code-review", "read
+# test-automation-workflow/references/reviewer-contract.md") but nothing tells it
+# the directory. Field evidence (ta-bench, 2026-09-23, five sessions on two
+# branches): leads and engineers ran `find / -maxdepth 6`, `ls ~/.claude/skills`
+# and `find ~/.claude -iname "*<agent>*"` hunting for their own skills and agent
+# files — 120s timeouts, unrelated caches and OTHER projects' memory read into
+# context. A rule in the agent body did not stop the first reflex; an absolute
+# path in the injected context pre-empts it. Lists every host dir present (a
+# repo installed for several hosts shows them all) plus the plugin root when
+# hooks run from a plugin install. Role-gated by the caller: plain sessions get
+# nothing. ~300 bytes; counted inside the cap.
+install_locations() {
+  local base="$1" hostdir skills="" agents="" root
+  for hostdir in .claude .github .codex .cursor .windsurf; do
+    [ -d "${base}/${hostdir}/skills" ] || continue
+    skills="${skills}${base}/${hostdir}/skills/<id>/, "
+    [ -d "${base}/${hostdir}/agents" ] && agents="${agents}${base}/${hostdir}/agents/, "
+  done
+  for root in "${CLAUDE_PLUGIN_ROOT:-}" "${CURSOR_PLUGIN_ROOT:-}" "${PLUGIN_ROOT:-}"; do
+    [ -n "$root" ] && [ -d "${root}/skills" ] || continue
+    skills="${skills}${root}/skills/<id>/, "
+    [ -d "${root}/agents" ] && agents="${agents}${root}/agents/, "
+  done
+  [ -n "$skills" ] || return 0
+  printf '# Installed with you — inside this project
+
+Libraries (skills): %s. Agent files: %s. Shared project context: %s/.agents/. Nothing of yours lives outside this project: never search / or ~ for a library, a reference or an agent file — what is not here was not installed.' \
+    "${skills%, }" "${agents:+${agents%, }}${agents:-${skills%, }}" "$base"
+}
+
 build_capped_context() {
   local base="$1" role="$2" instr_present="$3" cli_sub="$4"
   local agents_dir="${base}/.agents" dir="${base}/.agents/memory/${role}"
@@ -399,6 +430,7 @@ $(list_shared_files "$agents_dir" "$role")"
   local context="" overflow="" mf f header doc cand
   local rel
   if [ -n "$role" ]; then
+    context="$(install_locations "$base")"
     for mf in $(role_memory_files "$role"); do
       f="$(resolve_role_file "$base" "$role" "$mf")"; [ -n "$f" ] || continue
       rel="$(rel_role_file "$base" "$f")"

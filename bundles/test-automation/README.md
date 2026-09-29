@@ -137,7 +137,9 @@ context — only when the folder is trusted or an opt-in env var is set:**
 confirm folder trust once in an interactive `copilot` session. The CLI flags
 do not count; without the opt-in the hooks are skipped silently (only a
 `--log-level debug` line says so). In the VS Code extension, pick the agent in
-the chat panel and switch the session to auto-approve/bypass first.
+the chat panel and switch the session to auto-approve/bypass first. Whatever
+the host, keep the lead on a Sonnet-class model; the engineer slots may run on
+Haiku.
 Full per-host detail: [onboarding § Launching the agents](../../docs/onboarding/test-automation.md#launching-the-agents--run-them-as-your-main-agent).
 
 **Before Phase 1 — two prerequisites.** scout's tool-wiring inspects the
@@ -179,13 +181,14 @@ tracker, snapshots external bodies to disk, sizes each unit himself
 (un-automatable and already-covered verdicts are made **here**, before any
 build), routes it (`manual-qa-verified` / `needs-execution` / `combined` —
 table above), and runs the loop **one unit at a time**: the engineer builds on
-the unit's branch (green once, PR open, coverage declaration in the spec) → a
-**fresh engineer-typed reviewer** walks the case step-by-step against that
-declaration (static unless asked to re-run) → fix rounds until approved → the
-**gate** — its own agent, never the one who wrote the code — runs the unit's
-specs N consecutive green (default 3), the specs a modified symbol reaches
-once, the coverage-grammar grep and the CI-selection check → merge per the
-project's PR policy → tracker and TMS mirrored (automation executions only).
+the unit's branch (green N consecutive runs, PR open, coverage declaration in
+the spec) → a **fresh engineer-typed reviewer** walks the case step-by-step
+against that declaration and runs the spec once, editing nothing → fix rounds
+until approved → merge per the project's PR policy → tracker and TMS mirrored
+(automation executions only). A batch trunk gets one **gate** before it goes
+to base — its own agent, none of the builders — N consecutive green together,
+the specs a modified symbol reaches once, the coverage-grammar grep and the
+CI-selection check.
 One report per batch; whatever didn't land is replanned. On Claude Code, when
 you or the seed ask for a batch to run as a workflow, the shipped scripts run
 the same loop on a batch trunk with one machine-readable report.
@@ -232,8 +235,8 @@ diverge.
 
 The diagram shows the batch shape as the Claude Code workflow runs it (batch
 trunk, one hardening gate, one report). A single unit — the everyday case on
-any host — runs the same loop on its own branch with its own gate and merges
-per the project's PR policy.
+any host — runs the same loop on its own branch, proven by its builder's N runs and the
+reviewer's run, and merges per the project's PR policy.
 
 ```mermaid
 flowchart TD
@@ -250,8 +253,8 @@ flowchart TD
         intake["Intake — one TMS/tasks sweep, dedup,<br/>case snapshots to disk, clustering + sizing<br/>(un-automatable / already-covered die here)"]
         route{"Route per unit<br/>(provider policy)"}
         runner["manual-qa test-runner<br/>executes the case live"]
-        build["Build — branch cut FROM the trunk<br/>test-automation-engineer: green once,<br/>coverage declaration in the spec"]
-        review["Review — FRESH engineer-typed dispatch<br/>walks the case against the declaration<br/>(static, no execution)"]
+        build["Build — branch cut FROM the trunk<br/>test-automation-engineer: green N×,<br/>coverage declaration in the spec"]
+        review["Review — FRESH engineer-typed dispatch<br/>walks the case against the declaration<br/>(+ one run of the spec, edits nothing)"]
         integ["Merge back into the batch trunk<br/>tree returns to the trunk → next unit"]
         hgate{"Hardening gate — its own agent<br/>N× consecutive green + blast-radius run"}
         report[/"ONE report — per-case outcome<br/>+ findings + gate verdict"/]

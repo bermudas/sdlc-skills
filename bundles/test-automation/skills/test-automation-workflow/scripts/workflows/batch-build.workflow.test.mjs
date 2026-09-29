@@ -151,7 +151,7 @@ test('runner verdicts map: PASS builds with evidence, FAIL files a defect, BLOCK
   assert.match(text, /not automated until the product is fixed/);
   assert.match(text, /test-runner BLOCKED/);
   // FAIL → the engineer files per defect-filing and walks away
-  assert.match(text, /defect-filing discipline \(test-automation-implementation references\/defect-filing\.md/);
+  assert.match(text, /defect-filing discipline \(\.claude\/skills\/test-automation-implementation\/references\/defect-filing\.md/);
   assert.match(text, /File and walk away/);
   assert.match(text, /schema: DEFECT_SCHEMA/);
 });
@@ -179,16 +179,17 @@ test('combined route: no pre-execution ritual, live probing is an investigation 
   assert.match(text, /never a full pre-automation walkthrough/);
 });
 
-test('the locator ladder is ordered cheapest-first and manual-qa knowledge is read-only', () => {
-  assert.match(text, /LOCATOR LADDER \(cheapest first\)/);
-  assert.match(text, /\(1\) the surface cache/);
-  assert.match(text, /\(2\) manual-qa knowledge, READ-ONLY/);
-  // app_profile.md sections are what manual-qa actually produces — the factory
-  // never writes knowledge/selectors.md (cross-factory audit F1)
-  assert.match(text, /app_profile\.md` § Reliable Selectors and § Fragile Areas/);
-  assert.doesNotMatch(text, /knowledge\/selectors\.md/);
-  assert.match(text, /\(3\) the case file itself; \(4\) targeted live probing/);
-  assert.match(text, /reference their facts, never copy them/);
+// The locator ladder, the base-URL templating and the coverage grammar live in
+// the engineer's AGENT.md and the contracts — the body every host delivers —
+// not in the workflow prompt. The prompt carries the unit's facts, the route,
+// the tree discipline and the return shapes; restating rules there was ~50% of
+// the script by volume and drifted from the bodies (2026-09-28 trim).
+const ENGINEER_BODY = readFileSync(join(dirname(FILE), '../../../../agents/test-automation-engineer/AGENT.md'), 'utf8');
+test('the locator ladder is the engineer body\'s, not the prompt\'s', () => {
+  assert.match(ENGINEER_BODY, /surface cache/);
+  assert.match(ENGINEER_BODY, /manual-qa's `\.agents\/manual-qa\/` \(read-only\)/);
+  assert.doesNotMatch(text, /LOCATOR LADDER/);
+  assert.doesNotMatch(text, /\{\{base_url\}\}/);
 });
 
 test('evidence-built units never re-execute; thin/broken evidence escapes honestly', () => {
@@ -198,12 +199,6 @@ test('evidence-built units never re-execute; thin/broken evidence escapes honest
   // mq-verified evidence that does not hold → needs-execution, never self-run
   assert.match(text, /return status needs-execution and STOP/);
   assert.match(text, /under the manual-qa provider you never execute the case yourself/);
-});
-
-test('the templating bridge is named: {{base_url}} maps to the seeded config var', () => {
-  assert.match(text, /\{\{base_url\}\}/);
-  assert.match(text, /§ Base URL mapping/);
-  assert.match(text, /never hardcode the URL/);
 });
 
 // ---- coverage contract -----------------------------------------------------
@@ -218,24 +213,21 @@ test('IMPL/BUILD/REVIEW schemas carry coverage with the closed exclusion vocabul
   assert.match(text, /coverage: COVERAGE/);
 });
 
-test('the build prompt teaches the coverage grammar and forbids free-text reasons', () => {
-  assert.match(text, /COVERAGE CONTRACT — every delivered spec carries the machine-findable comment block/);
-  assert.match(text, /<case-id> coverage: steps <list>/);
-  assert.match(text, /invalid grammar and block at review and gate/);
-  assert.match(text, /case id appears in the test\\?'s identity/);
-  assert.match(text, /§ Coverage idiom/);
+test('the build prompt carries the coverage return shape and the un-automatable escalation', () => {
+  assert.match(text, /COVERAGE, as you return it: full=true only when every step of every case is asserted/);
+  assert.match(text, /covered-elsewhere \| blocked-by-defect \| un-automatable \| by-seeded-policy/);
   // the engineer cannot mint un-automatability past the intake screening
   assert.match(text, /cannot MINT un-automatable beyond what the intake screening judged/);
   assert.match(text, /request it with status needs-escalation/);
+  // stabilising is the builder's: N consecutive greens before handoff
+  assert.match(text, /STABILISE IT YOURSELF: \$\{GATE_N\} CONSECUTIVE green runs/);
 });
 
-test('the reviewer walks the case step-by-step, touches referents, and cross-checks intake', () => {
+test('the reviewer walks the case step-by-step, runs the spec once, edits nothing, and cross-checks intake', () => {
   assert.match(text, /WALK EVERY CASE STEP against the diff/);
   assert.match(text, /A silent gap — a step neither asserted nor excluded — is CHANGES_REQUESTED/);
-  assert.match(text, /TOUCH every referent, never take it on faith/);
-  assert.match(text, /run the named test once/);
-  assert.match(text, /open the filed defect/);
-  assert.match(text, /read the policy line in \.agents\/testing\.md/);
+  assert.match(text, /Run the unit\\'s spec ONCE in a clean process/);
+  assert.match(text, /YOU EDIT NOTHING on the branch/);
   assert.match(text, /CROSS-CHECK THE INTAKE VERDICT/);
   assert.match(text, /-verdicts\.json/);
   assert.match(text, /never mint it/);
@@ -613,11 +605,10 @@ test('the long-jobs rule pins one bounded sleep per call, early first look, no c
   assert.match(text, /NEVER chain sleeps inside one/);
 });
 
-test('no wholesale tree cleaning: receipts + fresh writes are protected', () => {
-  assert.match(text, /NEVER CLEAN THE TREE WHOLESALE/);
+test('no wholesale tree cleaning: the scoped alternative is named', () => {
+  assert.match(text, /never clean the tree wholesale/);
   assert.match(text, /git stash --include-untracked/);
   assert.match(text, /git stash push -- /);          // the scoped alternative
-  assert.match(text, /untracked bookkeeping/);
 });
 
 test('the preamble opens libraries only at the step that names them and forbids re-loading one already in context', () => {
@@ -627,12 +618,14 @@ test('the preamble opens libraries only at the step that names them and forbids 
   assert.match(text, /NEVER re-invoking the Skill tool for a skill you already carry/);
 });
 
-test('PREAMBLE carries the context-economy rules for every dispatch', () => {
-  assert.match(text, /Context economy \(hard rules\)/);
-  assert.match(text, /batch independent tool calls into ONE message/i);
-  assert.match(text, /screenshots only when a step fails or visual/i);
-  assert.match(text, /~15 tool turns per case/);
-  assert.match(text, /self-check not a cap/);
+// Context economy, the locator ladder, the coverage grammar and the masking
+// catalogue live in the agent bodies and contracts; the PREAMBLE carries only
+// what the workflow itself needs from a slot (findings[], commit-by-path, the
+// long-jobs rule) plus where the libraries are.
+test('PREAMBLE is dispatch mechanics, not a restated manual', () => {
+  assert.doesNotMatch(text, /Context economy \(hard rules\)/);
+  assert.match(text, /goes in your return\\'s findings\[\]/);
+  assert.match(text, /Libraries live in \.claude\/skills\/<id>\/ inside this project/);
 });
 
 // ---- cost levers -----------------------------------------------------------

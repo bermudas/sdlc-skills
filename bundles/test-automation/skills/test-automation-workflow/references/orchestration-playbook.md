@@ -181,7 +181,7 @@ Merging per unit rather than integrating at the end is deliberate. It keeps the 
 
 *Why this rule replaced its predecessor.* The old rule — "role memory never rides a case branch; workers report via `findings[]` and the lead records at close" — existed because field measurement (cov60) found **26 of 32 merge conflicts** were add/add collisions in `MEMORY.md`/`daily/*.md`, from **parallel** case branches cut off one base each creating the same file. Serialization removed the cause: unit N+1's branch is cut *after* unit N merged, so it inherits N's memory and appends — a modify, never an add/add. The old rule's residue was worse than nothing: workers (whose preloaded memory skill says "write what you learn") wrote anyway, the entries sat **untracked for the whole campaign**, and one wholesale stash (field incident 2026-08-03) swept six of them mid-wave while every later agent ran without them. One scoping rule survives from that era: mechanical self-check greps run against the project's code root (e.g. `-- automation/`), never the whole tree, so memory prose can't pollute a diff scan.
 
-**A known defect is declared, not masked — and declared in the coverage grammar.** A step blocked by a filed defect is excluded `blocked-by-defect: <TICKET>` in the spec's coverage block ([`coverage-contract.md`](coverage-contract.md)): the rest of the case automates with `coverage: partial`, the spec stays honestly green (the excluded step is not asserted, and the review verified the ticket), and the TMS back-write carries the exclusion. A defect that blocks the whole case is the **`defect-found`** outcome — defect filed, case not automated until the fix ships. Either way the masking catalogue (`test.fail()`, skip markers, weakened assertions) stays forbidden: the declaration is checkable, the mask is not. A permanently-red test in the batch would also block every healthy case beside it at the gate — measured on one batch, a single ticketed defect held four other cases red — which is exactly what the exclusion form avoids. When the defect ships, removing the exclusion re-arms the step; re-entry is ticket-driven, not next-batch-driven.
+**A known defect is a red test, not an exclusion.** A step the build can exercise and that fails on a filed defect stays asserted as the case demands — the test is red, the unit is `defect-found`, the branch is parked with its ticket and lands unchanged when the fix ships. `blocked-by-defect: <TICKET>` in the coverage block is for a step that cannot be exercised at all (the screen never renders, the API answers 500); the reviewer opens the ticket and checks that it truly blocks the step. Every masking device — `test.fail()`, skip markers, weakened or soft assertions used to hide — stays forbidden; a declared carve quarantine on a case recorded `blocked` is the one sanctioned skip.
 
 #### Gate — the merge signal
 
@@ -289,7 +289,7 @@ Seven terminal outcomes. They say **where a case ended**, not which state machin
 | Outcome | Means | Your move |
 |---|---|---|
 | `delivered` | built, statically reviewed, and proven by the gate's N consecutive greens — coverage `full`, or `partial` with declared exclusions | merge + mirror; the coverage note rides the back-write |
-| `defect-found` | live execution (the runner, or the combined route's first green attempt) hit a product defect that blocks the case | defect filed per the defect-filing discipline (file and walk away); the case re-enters when the fix ships — ticket-driven, not next-batch-driven |
+| `defect-found` | a product defect: the runner's FAIL before any build, or the build's honest red — the test written to the end and failing on the step the case demands | defect filed (defect-filing discipline); the unit's branch is parked with its ticket and lands when the fix ships, no rewrite; nothing is excluded to make it green |
 | `blocked` | something about THIS CASE stopped it — data, access, env, a conflict, a red gate, an R2 cap | classify per § Handling blockers, replan |
 | `un-automatable` | the screening verdicts rule the case out (complexity taxonomy) | close with the verdict as the note; do NOT re-dispatch |
 | `needs-execution` | policy says manual-qa executes, no qualifying evidence exists, and the runner could not be dispatched | tell the user to run the manual-qa suite and re-run the batch; the case re-enters untouched |
@@ -395,9 +395,9 @@ The `report.md` twin is the same data rendered for a human: a totals line, a tab
 
 2. **No defect masking — the dispatch prompt is the gate.** This enforces the builder-side rule in [the `test-automation-implementation` skill](../../test-automation-implementation/SKILL.md) § Hard Rules → No Defect Masking (the full forbidden catalogue + reverse-masking guard). Load-bearing at dispatch time: `test.fail()`, `xit()`, `@Ignore`, `pytest.skip()`, weakened assertions for product defects. When live execution or the test hits a product defect:
    - **No ticket yet** → the engineer files the defect FIRST (defect-filing discipline — pristine repro, file and walk away), THEN applies the below.
-   - **Defect isolated to one step** → exclude that step `blocked-by-defect: <TICKET-ID>` in the coverage block; the rest of the case ships `coverage: partial` (§ The loop — a known defect is declared, not masked).
-   - **Defect blocks the case** → outcome `defect-found`; the case is not automated until the fix ships.
+   - **A product defect the build hits** → the test is written to the end, the assertion the case demands stays on that step and fails, the ticket rides the Run Report and the PR, the unit is `defect-found` and its branch is parked until the fix ships (it lands with no rewrite). `blocked-by-defect` excludes only a step that cannot be exercised at all — never one that fails.
    - **`test.fail()` is never the answer.** A draft prompt containing "add `test.fail()`" → stop and rewrite.
+   - **A re-aimed step is a mask.** A builder that drives a different control because the named one did not behave has hidden the defect behind a green run; the reviewer's action-target check catches it, and a Run Report that admits it is `defect-found`, not `delivered`.
 
 3. **Coverage is contract law.** Every delivered spec carries the coverage declaration — case id in the test identity, every case step asserted or excluded in the fixed grammar, categories from the closed vocabulary with their referents ([`coverage-contract.md`](coverage-contract.md) — single source of truth). Your slice: the reviewer walks it (silent gap = blocking; referents touched; `un-automatable` exclusions cross-checked against the intake verdicts), the gate greps it, and the close sweep back-writes it (`full | partial` + excluded steps). A unit without a parsable declaration is not `delivered` — it cannot say what it covers.
 
@@ -509,11 +509,11 @@ It executes step by step over Playwright MCP and returns one trailing ```json bl
 
 ### Build dispatch (test-automation-engineer + test-automation-implementation)
 
-One template, three routes — the `EVIDENCE` line is what varies. The skill carries the slot contract — see [the `test-automation-implementation` skill](../../test-automation-implementation/SKILL.md). Green ONCE locally; the gate owns determinism.
+One template, three routes — the `EVIDENCE` line is what varies. The skill carries the slot contract — see [the `test-automation-implementation` skill](../../test-automation-implementation/SKILL.md). Green N consecutive runs locally (`testing.md § Merge gate`, default 3) — stabilising is the builder's; the batch gate proves the trunk.
 
 ```
 Build slot — automate {IDS} per your `test-automation-implementation` skill.
-Green once locally; ≤ 2 reruns on one root cause.
+Green N consecutive runs locally (§ Merge gate N, default 3) — stabilising is yours; ≤ 2 reruns on one root cause.
 
 Route: {manual-qa-verified | needs-execution (runner PASSED) | combined}
 EVIDENCE:
@@ -545,8 +545,14 @@ Per-unit parameters:
 The delivered spec carries the coverage declaration (coverage-contract.md):
 case id in the test identity, every case step asserted or excluded in the
 fixed grammar — exclusions only from the closed vocabulary with referents.
-A product defect: file it first (defect-filing discipline), then
-blocked-by-defect exclusion or `defect-found` return — never a mask.
+A product defect: file it first (defect-filing discipline), write the test to
+the end, keep the case's assertion on that step and let it fail, return
+`defect-found` — `blocked-by-defect` excludes only a step that cannot be
+exercised at all; never a mask.
+Adapt the path, never the target: a control the case names that does not do
+what the case says is a defect and a red test, not a locator to replace with a
+neighbour that "works"; declare every deviation from the case text in the spec
+and the Run Report.
 Write what live probing revealed back to .agents/automation/surface/<feature>.md
 and commit it BY EXACT PATH on your branch, with the spec.
 
@@ -617,15 +623,21 @@ A unit whose merge is refused is **parked**: reviewed, `blocked`, its branch kep
 
 ### Reviewer dispatch (test-automation-engineer FRESH dispatch + code-review + reviewer-contract)
 
-The contract file carries the slot — see [`references/reviewer-contract.md`](reviewer-contract.md) § Reviewer slot. An engineer-typed dispatch: independence is the fresh context plus the contract, not a different agent. This is a **static** review — no execution; the gate runs the spec. When `.agents/testing.md § Merge gate → reviewer live re-run` is `on`, the dispatch instead instructs the reviewer to additionally execute the spec once, replacing the do-NOT-execute line below. The prompt passes per-case parameters:
+The contract file carries the slot — see [`references/reviewer-contract.md`](reviewer-contract.md) § Reviewer slot. An engineer-typed dispatch: independence is the fresh context plus the contract, not a different agent. The reviewer walks the case and runs the unit's spec once in a clean process; `.agents/testing.md § Merge gate → reviewer run: off` makes it static (then the batch gate is the only independent run). The prompt passes per-case parameters:
 
 ```
-Reviewer slot — review PR #{PR_ID} for {IDS} per `references/reviewer-contract.md` § Reviewer slot.
-**You did NOT write this code** — adversarial eye, fresh dispatch. STATIC review: do NOT execute the spec.
+Reviewer slot — review PR #{PR_ID} for {IDS} per the `test-automation-workflow` skill's
+`references/reviewer-contract.md` § Reviewer slot — at
+`<skills root>/test-automation-workflow/references/reviewer-contract.md` in this
+project (substitute the host's skills directory as in § Intake); never a search.
+**You did NOT write this code** — adversarial eye, fresh dispatch. Walk the case against the diff AND run the unit's spec once in a clean process
+(line reporter; `rerun: no` only where `.agents/testing.md § Merge gate` says static).
+You EDIT NOTHING on the branch — findings come back to me, the builder fixes.
+Your last line is exactly `Verdict: APPROVED` or `Verdict: CHANGES_REQUESTED`.
 
 Per-unit parameters:
 - Case ID(s): {IDS}
-- Case source: .agents/automation/{SLUG}/cases/{ID}.md (or the in-repo case path)
+- Case source: .agents/automation/{SLUG}/cases/{ID}.md (or the in-repo case path) — from the repo root
 - PR ID: {PR_ID}
 - Screening verdicts (the exclusion budget): .agents/estimation/{SLUG}-verdicts.json
 
@@ -640,7 +652,12 @@ unavailable too, do NOT approve on the diff alone — return flagging
 
 Walk the case step by step against the code: every step asserted at that step
 or validly excluded (closed vocabulary + referent — TOUCH each referent);
-silent gap = blocking. Cross-check un-automatable exclusions against the
+silent gap = blocking. Every action must land on the control the case names:
+a decisive step re-aimed at another control because the named one "did not
+work" is CHANGES_REQUESTED and a defect to file, however green the run; a
+declared path adaptation (renamed button, changed route, reworded copy) with a
+clarification is fine; an undeclared deviation of any kind is blocking.
+Cross-check un-automatable exclusions against the
 verdicts file — the builder cannot mint un-automatability the screening
 didn't see.
 ```
@@ -703,7 +720,7 @@ A case can be delivered by **extending** an existing spec (new assertions or a n
 
 Where you also mirror work in a host task list, acceptable transitions:
 
-- **`completed`** — clean green in CI without masking; OR delivered `partial` with the defect filed and declared (`blocked-by-defect`).
+- **`completed`** — clean green in CI without masking, coverage declared (`partial` only for steps that cannot be exercised, each with its referent); a unit red on a ticketed defect is `defect-found`, not completed.
 - **`blocked`** — depends on another task / bug / decision. Always link the blocker via `addBlockedBy`.
 - **`pending`** — work not started; no blocker.
 - **`in_progress`** — currently being worked on.

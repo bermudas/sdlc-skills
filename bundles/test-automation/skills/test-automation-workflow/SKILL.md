@@ -50,7 +50,7 @@ On Claude Code, when the user or the seed asks for a batch to run as a workflow,
 
 ```js
 Workflow({
-  scriptPath: "<installed skill dir>/scripts/workflows/batch-build.workflow.mjs",
+  scriptPath: ".claude/skills/test-automation-workflow/scripts/workflows/batch-build.workflow.mjs",
   args: {
     slug: "<batch-slug>",                   // names .agents/automation/<slug>/
     base: "origin/<base-branch>",           // from .agents/profile.md

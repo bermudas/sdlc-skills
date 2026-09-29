@@ -1408,7 +1408,7 @@ function printHelp() {
                                test-automation / manual-qa / quality-engineering
                                factories. Needs a terminal.
     --mcp <a,b,c>              Write these MCP servers non-interactively, each in
-                               its target's native form (Claude .mcp.json; Copilot
+                               its target's native form (Claude .mcp.json; Copilot .mcp.json +
                                .vscode/mcp.json + .copilot/mcp-config.json; Codex
                                .codex/config.toml). Merges in, never clobbers.
     --symlink                  Symlink external skills from the shared cache
@@ -2412,8 +2412,12 @@ async function selectOne(title, items, defaultValue) {
 // the four auth dialects are generated per host: Claude `headersHelper` (reads .env) /
 // VS Code `${input:}` prompt / Copilot-CLI + Cursor + Windsurf literal placeholder /
 // Codex `mcp-remote` stdio wrapper + a [mcp_servers.<id>.env] token.
-const MCP_CATALOG = [
-  { id: "playwright", group: "Browser automation", label: "Playwright", desc: "multi-browser automation", cfg: { command: "npx", args: ["-y", "@playwright/mcp@latest"] } },
+export const MCP_CATALOG = [
+  // timeout: a hard per-call wall clock (ms) on hosts that honour it (Claude Code, Copilot CLI).
+  // Field incident (ta-bench 2026-09-26): one `browser_evaluate` carrying an event-promise that never
+  // resolved sat for 30 minutes — the host's idle default — and took the build slot with it. Legit
+  // Playwright MCP calls finish inside its own 60 s navigation timeout.
+  { id: "playwright", group: "Browser automation", label: "Playwright", desc: "multi-browser automation", cfg: { command: "npx", args: ["-y", "@playwright/mcp@latest"] }, timeout: 120000 },
   { id: "chrome-devtools", group: "Browser automation", label: "Chrome DevTools", desc: "Chrome + Lighthouse", cfg: { command: "npx", args: ["-y", "chrome-devtools-mcp"] } },
   { id: "accessibility-scanner", group: "Accessibility", label: "axe-core scanner", desc: "automated WCAG scanning", cfg: { command: "npx", args: ["-y", "mcp-accessibility-scanner"] } },
   { id: "snyk", group: "Security", label: "Snyk", desc: "SAST / SCA / IaC", cfg: { command: "snyk", args: ["mcp", "-t", "stdio"] } },
@@ -2428,18 +2432,34 @@ const MCP_CATALOG = [
   { id: "elitea-next", group: "Integrations", label: "ELITEA Next", desc: "EPAM ELITEA project", cfg: { type: "http", url: "https://next.elitea.ai/app/${ELITEA_PROJECT_ID:-630}/mcp" }, secret: { header: "Authorization", scheme: "Bearer ", env: "ELITEA_TOKEN", input: "elitea-token", prompt: "ELITEA API Key", placeholder: "YOUR_ELITEA_TOKEN", claudeUrl: "https://next.elitea.ai/app/${ELITEA_PROJECT_ID:-630}/sse", claudeType: "sse" } },
 ];
 
-// JSON hosts: file, servers-key, auth style. Copilot is special (TWO files: VS Code
-// `.vscode/mcp.json` with inputs[] prompts + Copilot CLI `.copilot/mcp-config.json`);
+// JSON hosts: file, servers-key, auth style (`timeout` = the host honours a per-server
+// tool-call timeout). Copilot is special — THREE files: the repo-root `.mcp.json` is the one
+// the Copilot CLI reads as workspace servers (1.0.88 reads `.mcp.json` / `.github/mcp.json`
+// only; `.vscode/mcp.json` support was removed with a migration notice, and a repo-local
+// `.copilot/mcp-config.json` is never read from the workspace) — skipped when the Claude
+// target is installed alongside, because Claude's copy of the same file already serves the
+// CLI; `.vscode/mcp.json` with inputs[] prompts is for the VS Code extension; and
+// `.copilot/mcp-config.json` is for `COPILOT_HOME=./.copilot` / `--additional-mcp-config`.
+// (ta-bench 2026-09-26: ~60 Copilot runs with only the last two files never saw the MCP.)
 // Codex is special (TOML, in `.codex/config.toml`).
-const MCP_JSON_HOSTS = {
-  claude: { rel: ".mcp.json", key: "mcpServers", auth: "headersHelper" },
+export const MCP_JSON_HOSTS = {
+  claude: { rel: ".mcp.json", key: "mcpServers", auth: "headersHelper", timeout: true },
   cursor: { rel: ".cursor/mcp.json", key: "mcpServers", auth: "literal" },
   windsurf: { rel: ".windsurf/mcp.json", key: "mcpServers", auth: "literal" },
 };
-const MCP_COPILOT = [
-  { rel: ".vscode/mcp.json", key: "servers", auth: "input", stdioType: true, inputs: true }, // VS Code Copilot
-  { rel: ".copilot/mcp-config.json", key: "mcpServers", auth: "literal", stdioType: true }, // Copilot CLI
+export const MCP_COPILOT = [
+  { rel: ".mcp.json", key: "mcpServers", auth: "literal", stdioType: true, timeout: true, unlessClaude: true }, // Copilot CLI workspace servers
+  { rel: ".vscode/mcp.json", key: "servers", auth: "input", stdioType: true, inputs: true }, // VS Code Copilot Chat
+  { rel: ".copilot/mcp-config.json", key: "mcpServers", auth: "literal", stdioType: true, timeout: true }, // COPILOT_HOME=./.copilot
 ];
+
+// The MCP files the Copilot target writes, given every target of this install: the
+// repo-root `.mcp.json` only when Claude is not installed alongside (its copy of that
+// file already serves the CLI, and carries Claude's own auth shape).
+export function copilotMcpFiles(targets) {
+  const claude = targets.some((t) => t.id === "claude");
+  return MCP_COPILOT.filter((h) => !(h.unlessClaude && claude));
+}
 
 function tomlArray(arr) {
   return `[${arr.map(tomlBasicString).join(", ")}]`;
@@ -2447,14 +2467,16 @@ function tomlArray(arr) {
 
 // One server's config object for a JSON host. authStyle: headersHelper (Claude reads the
 // token from .env) | input (VS Code `${input:}` prompt) | literal (a YOUR_… placeholder).
-// stdioType adds an explicit "type":"stdio" (Copilot wants it).
-function mcpConfigFor(entry, authStyle, stdioType = false) {
+// stdioType adds an explicit "type":"stdio" (Copilot wants it). withTimeout copies the
+// catalog entry's per-call `timeout` (ms) where the host honours the key.
+export function mcpConfigFor(entry, authStyle, stdioType = false, withTimeout = false) {
   const cfg = entry.cfg;
   if (cfg.command) {
     const out = stdioType ? { type: "stdio" } : {};
     out.command = cfg.command;
     out.args = [...cfg.args];
     if (cfg.env) out.env = { ...cfg.env };
+    if (withTimeout && entry.timeout) out.timeout = entry.timeout;
     return out;
   }
   const sec = entry.secret;
@@ -2475,6 +2497,7 @@ function mcpConfigFor(entry, authStyle, stdioType = false) {
     headers[sec.header] = authStyle === "input" ? `${sec.scheme}\${input:${sec.input}}` : `${sec.scheme}${sec.placeholder}`;
   }
   if (Object.keys(headers).length) out.headers = headers;
+  if (withTimeout && entry.timeout) out.timeout = entry.timeout;
   return out;
 }
 
@@ -2511,7 +2534,7 @@ function mcpInputs(entries) {
 
 // Merge selected servers into one JSON host file (never clobber other servers/keys; an
 // unparseable real file is left untouched). For VS Code, also merge the inputs[] prompts.
-function writeJsonMcpFile(rel, key, entries, authStyle, { stdioType = false, inputs = false } = {}) {
+function writeJsonMcpFile(rel, key, entries, authStyle, { stdioType = false, inputs = false, timeout = false } = {}) {
   const path = join(CWD, rel);
   let cur = {};
   if (existsSync(path)) {
@@ -2523,7 +2546,7 @@ function writeJsonMcpFile(rel, key, entries, authStyle, { stdioType = false, inp
     }
   }
   cur[key] = cur[key] || {};
-  for (const e of entries) cur[key][e.id] = mcpConfigFor(e, authStyle, stdioType);
+  for (const e of entries) cur[key][e.id] = mcpConfigFor(e, authStyle, stdioType, timeout);
   if (inputs) {
     const have = new Set((cur.inputs || []).map((i) => i.id));
     const add = mcpInputs(entries).filter((i) => !have.has(i.id));
@@ -2558,10 +2581,10 @@ function writeMcpSelections(targets, ids) {
     if (t.id === "codex") {
       if (writeCodexMcp(entries)) wrote.push(".codex/config.toml [mcp_servers]");
     } else if (t.id === "copilot") {
-      for (const h of MCP_COPILOT) if (writeJsonMcpFile(h.rel, h.key, entries, h.auth, h)) wrote.push(h.rel);
+      for (const h of copilotMcpFiles(targets)) if (writeJsonMcpFile(h.rel, h.key, entries, h.auth, h)) wrote.push(h.rel);
     } else {
       const h = MCP_JSON_HOSTS[t.id] || { rel: ".mcp.json", key: "mcpServers", auth: "literal" };
-      if (writeJsonMcpFile(h.rel, h.key, entries, h.auth)) wrote.push(h.rel);
+      if (writeJsonMcpFile(h.rel, h.key, entries, h.auth, h)) wrote.push(h.rel);
     }
   }
   for (const w of [...new Set(wrote)]) console.log(`      ✓ ${w} (${ids.join(", ")})`);

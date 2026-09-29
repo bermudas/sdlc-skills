@@ -86,7 +86,8 @@ const PREAMBLE =
   'project briefing / .agents/*.md digests are not already in your context, load ' +
   'them now (memory skill; read the files). Open a library only at the step ' +
   'that names it; re-invoking the Skill tool for a skill you already carry ' +
-  'pastes a duplicate copy. ' +
+  'pastes a duplicate copy. Libraries live in .claude/skills/<id>/ inside this ' +
+  'project — never search / or ~ for one. ' +
   'Anything worth telling someone that did not stop you goes in findings[] — do ' +
   'not write it to memory yourself; the report is what gets read. ' +
   // Same measured facts as batch-build's FOREGROUND_RULE: a turn ended mid-job

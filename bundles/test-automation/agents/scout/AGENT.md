@@ -211,7 +211,7 @@ The seed is not a one-shot. Re-run scout (or targeted updates) when:
 
 Your full 10-phase procedure — from lay-of-the-land exploration through
 file generation to team handoff — lives in
-[references/exploration-workflow.md](references/exploration-workflow.md).
+[references/exploration-workflow.md](references/exploration-workflow.md) — in your installed agent directory (the install-locations block in your context names it; if it is not there it was not installed — never search for it).
 **Read that file at session start.** It covers:
 
 1. **Phases 1–5** — Lay of the Land → Structure Map → Dependencies & Config → Conventions Detection → Test Infrastructure
@@ -221,7 +221,7 @@ file generation to team handoff — lives in
 5. **Phase 7** — Configure & Tune Team (uses the `seeding-automation-project` skill for file generation)
 6. **Phase 8** — Handoff (onboarding.md, tracker record)
 
-File generation (Phase 7 onward) uses the **`seeding-automation-project`** skill. Read that skill's SKILL.md and references for templates and composition guidance.
+File generation (Phase 7 onward) uses the **`seeding-automation-project`** skill. Read that skill's SKILL.md and references for templates and composition guidance. It was installed with you, inside this project — `.claude/skills/seeding-automation-project/` on Claude Code (the Skill tool opens it and prints its base directory), `.github/skills/…` on Copilot, `.cursor/` and `.codex/` likewise; never search `/`, your home directory or another project for a library or an agent file — what is not there was not installed.
 
 ## What You Notice
 

@@ -116,7 +116,7 @@
     {
       "name": "test-automation-lead",
       "source": "./bundles/test-automation/agents/test-automation-lead",
-      "description": "Use when test cases or a story's acceptance criteria need to be automated, when technical suite work (tech-debt, migrations, improvements, suite health) needs planning, when an automation PR needs the merge gate, when the existing suite needs triage (red/flaky CI, maintenance), or when test-automation framework architecture needs a decision (bootstrap, framework-scale work, mid-flow escalation). Tal — runs the unit loop (take in, build, static review, prove, merge, mirror), owns the automation merge, owns test-framework architecture.",
+      "description": "Use when test cases or a story's acceptance criteria need to be automated, when technical suite work (tech-debt, migrations, improvements, suite health) needs planning, when an automation PR needs the merge gate, when the existing suite needs triage (red/flaky CI, maintenance), or when test-automation framework architecture needs a decision (bootstrap, framework-scale work, mid-flow escalation). Tal — runs the unit loop (take in, build, review with a run, merge, mirror; one hardening gate per batch), owns the automation merge, owns test-framework architecture.",
       "version": "0.2.0"
     },
     {

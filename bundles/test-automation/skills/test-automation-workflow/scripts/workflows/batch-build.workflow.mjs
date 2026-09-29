@@ -20,7 +20,8 @@
 //                  FAIL files a defect and stops the case, BLOCKED stops it
 //     build      → one engineer dispatch derives the spec from the case and
 //                  implements it on a unit branch cut FROM the trunk
-//     review     → static, engineer-typed with the reviewer contract loaded
+//     review     → engineer-typed with the reviewer contract: the case walked
+//                  against the diff plus ONE run of the spec; edits nothing
 //     fix        → rounds until APPROVED (see loopVerdict)
 //     merge      → the unit branch into the trunk, then the tree RETURNS to it
 //   gate         → the batch's specs together, N consecutive green + affected
@@ -99,12 +100,12 @@
 
 export const meta = {
   name: 'ta-batch-build',
-  description: 'One batch, one report: triage routes every unit per the seeded execution-provider policy (manual-qa-verified | needs-execution | combined), units run in order on the batch trunk — execute via manual-qa\'s test-runner where policy demands it, build from the case on a branch cut from the trunk, static review against the coverage contract, fix to APPROVED, merge back — then one hardening gate (N consecutive green, blast-radius regression, mechanical coverage check), returning per-case outcomes and findings for the lead to land, classify and replan from',
+  description: 'One batch, one report: triage routes every unit per the seeded execution-provider policy (manual-qa-verified | needs-execution | combined), units run in order on the batch trunk — execute via manual-qa\'s test-runner where policy demands it, build from the case on a branch cut from the trunk (green N× — the builder stabilises), review against the coverage contract with one run of the spec, fix to APPROVED, merge back — then one hardening gate (N consecutive green, blast-radius regression, mechanical coverage check), returning per-case outcomes and findings for the lead to land, classify and replan from',
   whenToUse: 'Orchestrator (test-automation-lead) on Claude Code once a batch of cases has been planned and clustered — it runs the batch end to end; the lead (or a closer) lands it per seeded policy, classifies anything red, and replans the remainder',
   phases: [
     { title: 'Triage', detail: 'one read-only dispatch: reads .agents/testing.md § Execution provider and routes every unit (manual-qa-verified | needs-execution | combined)' },
     { title: 'Execution', detail: 'needs-execution units only: manual-qa\'s test-runner per case; FAIL files a defect, BLOCKED stops the case, no runner → honestly needs-execution' },
-    { title: 'Build', detail: 'per unit: one engineer dispatch derives the spec from the case and implements green-once on a branch cut from the trunk, static review, fix rounds, merge back' },
+    { title: 'Build', detail: 'per unit: one engineer dispatch derives the spec from the case and implements it green N× on a branch cut from the trunk, review with one run of the spec, fix rounds, merge back' },
     { title: 'Gate', detail: 'the batch specs together N consecutive green, plus the mechanical coverage check and one run of the specs the batch could have broken — its own agent, never the implementer' },
     { title: 'Report', detail: 'one writer: per-case outcomes + coverage + findings to disk' },
   ],
@@ -261,21 +262,17 @@ const label = (unit) => unit.map((c) => c.id).join('+')
 // failed. One `sleep 300` costs the same as one 2-second check.
 const FOREGROUND_RULE =
   'LONG JOBS — test suites especially. A foreground call is killed at its `timeout` ' +
-  '(default 120s, MAXIMUM 600000ms), so ALWAYS pass timeout: 600000 on a suite run, ' +
-  'and let the call block when the job fits inside it. ' +
-  'When the job does NOT fit in one call: launch it detached, writing its output to a file, ' +
-  'then WAIT with blocking foreground polls — ONE `sleep <n>; <tail the output file>` per call, each with ' +
-  'timeout: 600000 — until it is done. Sleeping in the foreground is legal and cheap: it is ONE turn ' +
-  'however long you sleep. Make the FIRST poll short (~60-120s) — a run that dies in its first minute ' +
-  'must not cost a five-minute blind sleep — then settle at ~`sleep 300`. NEVER chain sleeps inside one ' +
-  'call (`sleep 120; tail; sleep 240; tail`): the chain outlives the call cap and is killed at its own ' +
-  'timeout, taking the tail you already read with it — one sleep, one look, return, repeat. ' +
-  'NEVER end a turn while a job is running — nothing will wake you (measured: you are forced to ' +
-  'report 28ms later, before the job finishes, and neither run_in_background nor Monitor beats that), ' +
-  'this workflow blocks on your return, and your silence is indistinguishable from thinking. ' +
-  'NEVER poll at second-level intervals either — you pay a full context per turn, and a busy-wait ' +
-  'exhausts your turn budget and gets you cut off mid-job (measured: 27 polls, $1.29, no verdict). ' +
-  'If a job is too long even for sleep-polling, say so in findings[] and run the narrower selection you need.'
+  '(default 120s, MAXIMUM 600000ms): ALWAYS pass timeout: 600000 on a suite run and ' +
+  'let the call block when the job fits inside it. When it does NOT fit in one call: ' +
+  'launch it detached, writing its output to a file, then WAIT with blocking foreground ' +
+  'polls — ONE `sleep <n>; <tail the output file>` per call, each with timeout: 600000 — ' +
+  'until it is done. Make the FIRST poll short (~60-120s) so a run that dies in its ' +
+  'first minute is seen, then settle at ~`sleep 300`. NEVER chain sleeps inside one ' +
+  'call: the chain outlives the call cap and is killed with the tail you already read. ' +
+  'NEVER end a turn while a job is running — nothing will wake you (you are forced to report ' +
+  '28ms later), this workflow blocks on your return, and your silence looks like thinking. ' +
+  'NEVER poll at second-level intervals — every turn re-sends your whole context. ' +
+  'A job too long even for sleep-polling: say so in findings[] and run the narrower selection you need.'
 
 // A killed slot is retried with the SAME prompt and no memory of the attempt
 // that died — the harness stall-retry and a resume-after-pause both work that
@@ -314,72 +311,30 @@ const quote = (s, max = 400) => String(s ?? '')
 // Hook insurance: injection verified for named agentTypes but undocumented —
 // every worker self-heals if it arrives cold.
 const PREAMBLE =
-  'You are dispatched from the batch workflow. If your role memory / project ' +
-  'briefing / .agents/*.md digests are not already in your context, load them ' +
-  'now (memory skill; read the files). Open a library (Skill tool, or Read by ' +
+  'You are dispatched from the batch workflow. If your role memory or the ' +
+  '.agents/*.md digests are not in your context, load them now (memory skill; ' +
+  'read the files). Libraries live in .claude/skills/<id>/ inside this project ' +
+  '— never search / or ~ for one. Open a library (Skill tool, or Read by ' +
   'path) only at the step that names it, ' +
-  'NEVER re-invoking the Skill tool for a skill you already carry: every ' +
-  'invocation pastes the FULL skill text again. ' +
+  'NEVER re-invoking the Skill tool for a skill you already carry. ' +
   // The findings channel: a durable gotcha has somewhere to go that is read.
-  'Anything worth telling someone that did NOT stop you — a product defect you ' +
-  'filed, a place the case text disagrees with the live product, an open ' +
-  'question, a gotcha another agent would want — goes in your result\'s ' +
-  'findings[] with the right kind — the report is how the LEAD hears it. ' +
-  // Two layers (instructions § Agent memory): role memory is LOCAL and
-  // gitignored — the ignore IS the protection (ignored files survive
-  // `stash -u`/`clean -fd`; the untracked-not-ignored era lost six entries
-  // to one wholesale stash, 2026-08-03). The shared, committed layer is
-  // .agents/knowledge/ — that is what travels between machines and roles.
-  'Durable role knowledge — a live-product quirk, a framework gotcha, a ' +
-  'workaround the next dispatch will need — goes in your role memory ' +
-  '(memory skill; LOCAL and gitignored — never `git add` it), and when it is ' +
-  'cross-role, verified and durable, promote it to .agents/knowledge/ — THAT ' +
-  'layer ships. Before writing an APP fact anywhere, check the manual-qa KB ' +
-  '(.agents/manual-qa/knowledge/, READ-ONLY): already there -> reference it, ' +
-  'never copy (copies drift). You COMMIT WHAT YOU PRODUCE: code, the surface ' +
-  'cache, and knowledge promotions alike, `git add` by exact path on the ' +
-  'branch you are on. Committed knowledge survives tree cleaning and ' +
-  'branch switches, gitignored memory survives sweeps — plain-untracked ' +
-  'files are what sweeps delete. ' +
-  // Context economy: the bill is resident-context × turns — every turn re-sends
-  // your whole context, so turn count and payload size ARE the cost. Field
-  // measurement: workers averaged ~30 turns at ~1 tool call per turn.
-  'Context economy (hard rules): batch independent tool calls into ONE message ' +
-  '(issue non-dependent reads/greps together, never one tool per turn); read a ' +
-  'file once and work from what you read (ranged reads for big files; no ' +
-  're-reads to double-check what is already in context); keep runner output ' +
-  'lean (line/dot reporter, tail long failures — never dump a full HTML report ' +
-  'or trace into the transcript); screenshots only when a step fails or visual ' +
-  'judgment is the task — save to disk and cite the path instead of re-emitting ' +
-  'pixels. Soft budget, a self-check not a cap: ~15 tool turns per case in ' +
-  'your unit (batching makes turns dense — 15 batched turns carry what ~40 ' +
-  'single-call turns did). A genuinely long case — 30 steps, a deep debug — ' +
-  'may exceed it; what the check catches is CIRCLING: re-reading what is ' +
-  'already in context, retrying the same probe, exploring without acting. At ' +
-  'each ~15-turn mark ask: did the last stretch advance the case, or circle? ' +
-  'Advance -> continue. Circle -> act on what you have and record the gap in ' +
-  'findings/notes. ' +
-  // Field incident 2026-08-03: one `git stash --include-untracked` before a
-  // checkout swept 6 freshly written memory entries and 3 run receipts out of
-  // the tree. They were recoverable, but every later agent ran without them.
-  'NEVER CLEAN THE TREE WHOLESALE. `git stash --include-untracked`, ' +
-  '`git clean -fd`, `git checkout -- .` and `git reset --hard` delete work you ' +
-  'did not write: run receipts are untracked bookkeeping, and memory or ' +
-  'surface-cache notes written since the last commit are just as exposed — all ' +
-  'of it vanishes silently. Need a clean tree before a checkout? Stash BY PATH ' +
-  '(`git stash push -- <your paths>`) or commit your own work first, and leave ' +
-  'everything you did not create alone. ' +
-  // Denials block an EFFECT, not the task. Same effect via another shape =
-  // evasion; a different allowed route to the goal = adaptation — take it,
-  // but on the record, so a human can veto a substitution that broke intent.
-  'A PERMISSION DENIAL BLOCKS AN EFFECT, NOT THE TASK. Never re-achieve the ' +
-  'SAME blocked effect through a different shape (a script instead of the ' +
-  'denied command, an alternate binary, a broader allowed command) — that ' +
-  'evades a pattern, not a policy. But a genuinely different allowed route to ' +
-  'the task goal — one that does NOT produce the blocked effect — is ' +
-  'legitimate: take it and record the substitution in findings/notes (what ' +
-  'was denied, what you did instead). No such route -> the case goes blocked ' +
-  'with the denial recorded, and you continue with what remains. ' +
+  'Anything worth telling someone that did NOT stop you — a defect you filed, ' +
+  'a place the case disagrees with the live product, an open question, a ' +
+  'gotcha another agent would want — goes in your return\'s findings[] with ' +
+  'its kind: the report is how the LEAD hears it. ' +
+  // What lands is what is committed — by exact path, on the branch you are on.
+  // (Field incident 2026-08-03: one wholesale stash swept six memory entries
+  // and three receipts out of the tree.)
+  'You COMMIT WHAT YOU PRODUCE by exact path on your branch — code, the surface ' +
+  'cache, memory — and never clean the tree wholesale: ' +
+  '`git stash --include-untracked`, `git clean -fd`, `git checkout -- .` and ' +
+  '`git reset --hard` delete work you did not write; `git stash push -- <your paths>` ' +
+  'instead. ' +
+  // Denials block an EFFECT, not the task.
+  'A PERMISSION DENIAL BLOCKS AN EFFECT, NOT THE TASK: never re-achieve the ' +
+  'same blocked effect through another shape; a genuinely different allowed ' +
+  'route is fine, recorded in notes; none -> the case goes blocked with the ' +
+  'denial recorded. ' +
   FOREGROUND_RULE
 
 // ---- worker schemas --------------------------------------------------------
@@ -440,8 +395,8 @@ const IMPL_SCHEMA = {
     // 4 reruns on 4 distinct causes is within contract, 3 on one cause is not.
     rerun_causes: { type: 'array', items: { type: 'string' } },
     // Tests that are RED BY DESIGN: the doctrine's answer to a ticketed product
-    // defect is `expect.soft()` with a `// Known defect: <TICKET>` comment, which
-    // fails loudly and stays failing until the product ships. Correct — and it
+    // defect is the case's own assertion left failing on that step — the test
+    // written to the end, red until the product ships. Correct — and it
     // makes the batch gate unpassable, taking every healthy case down with it
     // (measured: one such case blocked four others). Declaring them lets the gate
     // run them without counting them, and lets a case be reported honestly as
@@ -878,7 +833,7 @@ async function runExecution(unit) {
       filed = await agent(
         `${PREAMBLE}\n\nDefect-filing slot — manual-qa's test-runner just executed ${fids.join(', ')} against the live product and FAILED:\n` +
         failed.map((f) => `- ${f.id}: step ${quote(String(f.step), 20)}: ${f.why}${f.screenshot ? ` (screenshot: ${f.screenshot})` : ''}`).join('\n') +
-        '\nFile ONE defect per case per your defect-filing discipline (test-automation-implementation references/defect-filing.md — the pristine-repro gate applies before anything is filed). ' +
+        '\nFile ONE defect per case per your defect-filing discipline (.claude/skills/test-automation-implementation/references/defect-filing.md — the pristine-repro gate applies before anything is filed). ' +
         'File and walk away: you do not fix the product, you do not automate the failing case, and you do not re-litigate the runner\'s verdict — a repro that does NOT reproduce goes in the filed[] note instead of a ticket. ' +
         `Return unit_ids EXACTLY as given here: [${fids.join(', ')}], and one filed[] entry per case with the tracker ref (null if filing failed — say why in its note).`,
         { label: `defects:${fids.join('+')}`, phase: 'Execution', agentType: TYPES.implementer, ...WORKER, schema: DEFECT_SCHEMA }
@@ -912,26 +867,26 @@ async function runBuild(members, evidence, route) {
   if (!admitUnit(members, 'build')) return null
 
   const provenance = route === 'combined'
-    ? 'EXECUTION DOCTRINE (provider self): there is no separate "execute the case first" ritual — the FIRST GREEN RUN of your test against the real system IS the case\'s first execution. A live browser (Playwright MCP / browser-verify) is an INVESTIGATION tool at your discretion: extract a locator, clarify a step, find out why the direct approach fails — targeted probes of minutes, never a full pre-automation walkthrough. If a green run is unreachable because the PRODUCT contradicts the case, that is a defect: file it per your defect-filing discipline (references/defect-filing.md), declare the red test in expected_red[], and say so in findings. '
+    ? 'EXECUTION DOCTRINE (provider self): there is no separate "execute the case first" ritual — the FIRST GREEN RUN of your test against the real system IS the case\'s first execution. A live browser is an INVESTIGATION tool at your discretion — targeted probes of minutes, never a full pre-automation walkthrough. A product defect met on the way: file it, keep the test red on the step the case demands, declare it in expected_red[] (below) — defect-found, never a mask. '
     : `EXECUTION PROVENANCE: this unit was already executed live by manual-qa — do NOT re-execute a case end-to-end in a browser (a targeted probe for a locator or a wait is fine; a full walkthrough re-buys what the evidence already paid for). Evidence to build from: ${evidence.length ? evidence.join(' ; ') : '(none listed — treat as thin, probe live for what is missing)'} plus the .agents/manual-qa/ KB. Cite the manual-qa run as the unit's execution provenance in your PR/notes. ${route === 'manual-qa-verified' ? 'If the evidence does not hold for a case (no PASS verdict, case file missing, contradicts the snapshot), return status needs-execution and STOP — under the manual-qa provider you never execute the case yourself. ' : ''}`
 
   const b = await agent(
     `${PREAMBLE}\n\nBuild slot — turn ${members.map((c) => `${c.id}${c.title ? ` (${quote(c.title, 120)})` : ''}`).join(', ')} into automated tests in ONE dispatch, ` +
     `THE CASE IS THE SOURCE OF TRUTH and you never edit it. Read each case in full first: ${ids.map((id) => SRC(id)).join(' , ')} (written at intake; ONLY if missing, fetch via the project's TMS adapter (.agents/test-automation.yaml) and note the gap). Derive what to automate straight from its steps and expected results — there is no intermediate spec artifact. ` +
     provenance +
-    'LOCATOR LADDER (cheapest first): (1) the surface cache `.agents/automation/surface/<feature>.md` — verify handles as you use them; (2) manual-qa knowledge, READ-ONLY: `.agents/manual-qa/app_profile.md` § Reliable Selectors and § Fragile Areas — reference their facts, never copy them; (3) the case file itself; (4) targeted live probing. Everything a live probe teaches you goes BACK into the surface cache: create or update the feature\'s file and commit it on your branch with the code. ' +
-    'Authored cases template `{{base_url}}`; your code resolves the project\'s base-URL config var per `.agents/testing.md` § Base URL mapping — never hardcode the URL. ' +
+    'What live probing teaches you goes BACK into the surface cache `.agents/automation/surface/<feature>.md` — create or update the feature\'s file and commit it on your branch with the code. ' +
     `YOU OWN THE TREE and nothing else runs. Ensure the batch trunk first: \`git rev-parse --verify ${TRUNK}\` — check it out if it exists anywhere; if it exists NOWHERE, \`git checkout -B ${TRUNK} ${BASE}\` (never -B an existing trunk — that discards merged units), then \`git push -u origin ${TRUNK}\` ONLY if this project pushes to a remote (\`.agents/profile.md\` § Automation PR policy / \`git remote -v\`); on a local-only project skip pushes, that is expected, not a failure. THEN cut your feature branch FROM ${TRUNK} — it already carries every unit that finished before you, so page-object and fixture work accumulates and you are never rebasing onto a surprise. Stay on your own feature branch and stage ONLY your own paths (\`git add <paths>\`, never \`-A\`/\`.\`). ` +
     (members.length > 1
       ? `CLUSTER unit: ${members.length} similar cases on ONE branch. Write ONE parameterized spec (a data row per case, each row asserting its OWN expected values, its case id tagged on its row's test so it fails by itself) ONLY where the cases are true variants of one flow — never flatten distinct expected values into a shared assertion: that is how a case silently stops being tested. Cases that merely share a surface get SEPARATE specs; shared page objects and fixtures are of course reused. `
       : '') +
-    'COVERAGE CONTRACT — every delivered spec carries the machine-findable comment block: `<case-id> coverage: steps <list>` plus, where steps are excluded, `<case-id> excluded: <step> (<category>: <referent> — <note>)`. The categories are CLOSED — covered-elsewhere (referent: the existing test that asserts it) | blocked-by-defect (filed defect id) | un-automatable (automation-scoping complexity-taxonomy category) | by-seeded-policy (the policy line in .agents/testing.md) — and every one REQUIRES its referent; free-text reasons ("flaky", "hard", "not needed") are invalid grammar and block at review and gate. Every case step traces to an assertion or an explicit exclusion; the case id appears in the test\'s identity (title/annotation/tag); the project\'s § Coverage idiom (.agents/testing.md) rides on top, the baseline block is always present regardless. You cannot MINT un-automatable beyond what the intake screening judged (the automation-scoping verdicts) — request it with status needs-escalation instead, naming the step and why. ' +
-    'If any assertion is red for a PRODUCT reason with a ticket (the `expect.soft()` + `// Known defect: <TICKET>` case), that test is RED BY DESIGN and stays red until the product ships. Do NOT weaken it — declare it in expected_red[] with the spec path, the test id, the ticket, one line of why, and (in a multi-case unit) the case_ids the red test belongs to, so only THOSE cases are held on the ticket and not their healthy neighbours on the same branch. The gate then runs it without counting it against the batch, and the affected case is reported defect-found on that ticket instead of delivered. An undeclared red-by-design test makes the gate unpassable and blocks every healthy case beside it. ' +
-    'Implement inside the existing framework, run green ONCE locally (determinism is the gate\'s job, not repeated local runs), retry budget ≤ 2 reruns on the SAME root cause — distinct causes each get their own budget — then land per `.agents/profile.md` § Automation PR policy: where the project uses PRs, open yours against ' + TRUNK + `, NOT against ${BASE} — case PRs land on the batch trunk, and one PR takes the trunk to ${BASE} after the gate; on a project with no PR mechanism leave your feature branch ready for the merge step. Leave the tree on your feature branch either way. ` +
+    'COVERAGE, as you return it: full=true only when every step of every case is asserted; otherwise full=false with one excluded[] entry per excluded step ({step: "<case-id>/<step>", category, referent, note}) mirroring the comment blocks in your specs — categories are CLOSED (covered-elsewhere | blocked-by-defect | un-automatable | by-seeded-policy), each with its verifiable referent. You cannot MINT un-automatable beyond what the intake screening judged (the automation-scoping verdicts) — request it with status needs-escalation instead, naming the step and why. ' +
+    'A test red on a ticketed PRODUCT defect — the case\'s assertion on that step, left failing — is RED BY DESIGN and stays red until the product ships. Do NOT weaken it: declare it in expected_red[] with the spec path, the test id, the ticket, one line of why, and (in a multi-case unit) the case_ids it holds, so only THOSE cases are held on the ticket. The gate then runs it without counting it, and the case is reported defect-found on that ticket instead of delivered. An undeclared red makes the gate unpassable and blocks every healthy case beside it. ' +
+    `STABILISE IT YOURSELF: ${GATE_N} CONSECUTIVE green runs in clean processes before you hand off — a flake is yours to remove; retry budget ≤ 2 reruns on the SAME root cause, distinct causes each get their own budget. ` +
+    'Then land per `.agents/profile.md` § Automation PR policy: where the project uses PRs, open yours against ' + TRUNK + `, NOT against ${BASE} — case PRs land on the batch trunk, and one PR takes the trunk to ${BASE} after the gate; on a project with no PR mechanism leave your feature branch ready for the merge step. Leave the tree on your feature branch either way. ` +
     CHECKPOINT_RULE +
     'If you cannot proceed because of an ACCOUNT/USAGE LIMIT (not a problem with the app or the case), say exactly that in notes — it stops the batch cleanly instead of stopping healthy cases. ' +
     `Return unit_ids EXACTLY as given here: [${ids.join(', ')}] — it keys this dispatch's telemetry attribution; never add, drop, or reformat ids. ` +
-    'Return status/branch/pr/reruns (plus rerun_causes: one short root-cause label per rerun — the cap is per cause, not total), expected_red[], and coverage: full=true only when every step of every case is asserted; otherwise full=false with one excluded[] entry per excluded step ({step: "<case-id>/<step>", category, referent, note}) mirroring the comment blocks in your specs.',
+    'Return status/branch/pr/reruns (plus rerun_causes: one short root-cause label per rerun — the cap is per cause, not total), expected_red[], and coverage as above.',
     { label: `build${route === 'combined' ? '' : ':mq'}:${label(members)}`, phase: 'Build', agentType: TYPES.implementer, ...WORKER, schema: BUILD_SCHEMA }
   )
   if (!b) {
@@ -978,17 +933,15 @@ const REVIEW_LENSES = [
 function reviewOnce(u, impl, fixNote, lens) {
   const ids = u.members.map((m) => m.id)
   return agent(
-    `${PREAMBLE}\n\nReviewer slot — STATIC review of ${ids.join(', ')} per the test-automation-workflow skill's references/reviewer-contract.md. ` +
+    `${PREAMBLE}\n\nReviewer slot — review ${ids.join(', ')} per .claude/skills/test-automation-workflow/references/reviewer-contract.md (the test-automation-workflow skill, inside this project — never a search). ` +
     'You are engineer-TYPED by design: independence here is a clean context plus that contract — load your code-review skill (on-demand) if it is not in your context. ' +
-    'Do not execute the unit\'s specs (the hardening gate does); the ONE sanctioned run is touching a covered-elsewhere referent, below. ' +
-    `Branch: ${impl.branch}. PR: ${impl.pr ?? 'n/a'}. ` +
-    'Read the diff via `git diff <base>...<branch>` — do NOT check the branch out (the tree is shared and a build may follow yours). ' +
+    `Branch: ${impl.branch}. PR: ${impl.pr ?? 'n/a'}. The tree is on that branch: read the diff via \`git diff ${TRUNK}...${impl.branch}\` and work from where the tree stands — do NOT switch branches (the tree is shared; the merge step moves it). ` +
+    'Run the unit\'s spec ONCE in a clean process (line reporter, tail the failures), plus the named covered-elsewhere test when you touch that referent — you fix nothing. ' +
     `FIRST read each case snapshot (${ids.map((id) => SRC(id)).join(' , ')}; fetch via the TMS adapter only if missing), then WALK EVERY CASE STEP against the diff: each step ends in an assertion AT that step, or in an explicit exclusion line in the spec's coverage block. A silent gap — a step neither asserted nor excluded — is CHANGES_REQUESTED. ` +
-    'COVERAGE GRAMMAR: `<case-id> coverage: steps <list>` / `<case-id> excluded: <step> (<category>: <referent> — <note>)`; categories are closed (covered-elsewhere | blocked-by-defect | un-automatable | by-seeded-policy) and each REQUIRES a verifiable referent — a free-text reason is invalid grammar and blocking. TOUCH every referent, never take it on faith: covered-elsewhere -> run the named test once and confirm it asserts what the exclusion claims (at that step, not merely the same screen); blocked-by-defect -> open the filed defect; un-automatable -> check the category exists in the automation-scoping complexity taxonomy; by-seeded-policy -> read the policy line in .agents/testing.md. ' +
-    'CROSS-CHECK THE INTAKE VERDICT: exclusions must fit what the intake screening judged (the automation-scoping verdicts file for this scope, `.agents/estimation/<scope>-verdicts.json` where present) — an un-automatable the screening did not see is blocking; the engineer may REQUEST it (escalation to the lead), never mint it. ' +
+    'CROSS-CHECK THE INTAKE VERDICT: exclusions must fit what the intake screening judged (`.agents/estimation/<scope>-verdicts.json` where present) — an un-automatable the screening did not see is blocking; the engineer may REQUEST it (escalation to the lead), never mint it. ' +
     (ids.length > 1 ? 'Where several cases share one parameterized spec: per-ROW verification — every case id maps to a data-table row whose DISTINCT expected values are actually asserted; a shared flattened assertion is CHANGES_REQUESTED. ' : '') +
-    'The masking hunt is yours: test.fail/skip/soft-pass patterns, catch-and-ignore, weakened assertions — a hidden red is blocking (the declared, ticketed expected_red pattern is the one sanctioned exception). ' +
-    (lens ? `Your assigned review lens — judge ONLY through it: ${lens}. ` : 'Cover the step walk, the coverage grammar, and the masking hunt. ') +
+    'Every action lands on the control the case names — a re-aimed decisive step is CHANGES_REQUESTED and a defect to file (contract § Deviation); the declared, ticketed expected_red pattern is the one sanctioned red. YOU EDIT NOTHING on the branch — findings go in blocking[]/findings[], the builder fixes. ' +
+    (lens ? `Your assigned review lens — judge ONLY through it: ${lens}. ` : 'Cover the step walk, the coverage contract, and the masking hunt. ') +
     (fixNote
       ? `This is the re-review after a fix round. Prior blocking findings:\n${fixNote}\n` +
         'For EVERY item you still block on, put an entry in blocking_detail[] with the status that is TRUE OF THE DIFF, not of your patience:\n' +
@@ -1061,7 +1014,7 @@ function loopVerdict(review) {
 }
 
 // Tests the batch KNOWS are red: ticketed product defects the doctrine says to
-// assert softly rather than hide. The gate runs them and reports them, but they
+// leave failing on the step the case demands rather than hide. The gate runs them and reports them, but they
 // do not count against its green requirement — otherwise one ticketed defect
 // makes the batch unpassable forever.
 const EXPECTED_RED = []
@@ -1474,7 +1427,7 @@ if (!SKIP_GATE && merged.length) {
     // The enum distinction only pays off if the gate knows which one it is.
     `IF YOU ARE CUT OFF before the ${GATE_N} runs finish — you are told to report while a run is still going — use verdict 'incomplete', NOT 'not-run'. They mean different things: 'not-run' is "nothing was attempted", 'incomplete' is "I was mid-flight". With 'incomplete' set runs to the number that ALREADY went green, list those in green_specs, and use notes to say exactly where to resume: the branch, the run set, and what remains. A resumable gate is worth far more to the lead than a blank one, and it is the difference between re-running one run and re-running all ${GATE_N}. ` +
     (EXPECTED_RED.length
-      ? `RED BY DESIGN — do not count these against the green requirement:\n${EXPECTED_RED.map((r) => `  - ${quote(r.spec, 200)}${r.test_id ? ` :: ${quote(r.test_id, 120)}` : ''} — ticket ${quote(r.ticket, 60)} (${quote(r.why, 200)})`).join('\n')}\nRun them like everything else and report exactly what they did, but the N-consecutive-green contract covers only the OTHER specs. These carry a ticketed product defect the implementer asserted softly rather than hid — a permanently failing test is the correct signal, and counting it would make this batch unpassable while blocking every healthy case in it. If one of them comes back GREEN, say so loudly in notes: the product shipped a fix and the ticket can close. `
+      ? `RED BY DESIGN — do not count these against the green requirement:\n${EXPECTED_RED.map((r) => `  - ${quote(r.spec, 200)}${r.test_id ? ` :: ${quote(r.test_id, 120)}` : ''} — ticket ${quote(r.ticket, 60)} (${quote(r.why, 200)})`).join('\n')}\nRun them like everything else and report exactly what they did, but the N-consecutive-green contract covers only the OTHER specs. These carry a ticketed product defect the implementer left failing on the step the case demands rather than hid — a red test is the correct signal, and counting it would make this batch unpassable while blocking every healthy case in it. If one of them comes back GREEN, say so loudly in notes: the product shipped a fix and the ticket can close. `
       : '') +
     'Do NOT merge anything. Do NOT classify the failure (product defect vs flake vs architectural — that is the lead\'s call). Do NOT fix. ' +
     FOREGROUND_RULE +
@@ -1638,7 +1591,7 @@ return {
     : gate?.verdict === 'green'
       // ONE PR takes the whole trunk to base — the units already merged into it,
       // so what was gated and what lands are the same object.
-      ? `Gate green on ${gateBranch}. LAND IT: one PR from ${gateBranch} to ${BASE} per .agents/profile.md § Automation PR policy (auto-merge / human-approved / manual decides who presses it), then mirror to the TMS (update_execution with the gate outcome — automation executions ONLY, manual-qa's live runs are their own record — plus each case's status/coverage note: full | partial with the excluded steps and reasons, and the PR link) and run the close sweep. Replan anything not 'delivered'. Where the tokenomics scope contract is active (a session-start line named your session id): record outcomes as they land (work-scope.mjs outcome <ID>=delivered …), then work-scope.mjs close — it renders ${REPORT_DIR}/batch-report.md+.html and flags receipt DRIFT — and publish per .agents/profile.md § Reporting policy (dispatch the cheap publisher; no policy → the files ARE the report, flag the gap).`
+      ? `Gate green on ${gateBranch}. LAND IT: one PR from ${gateBranch} to ${BASE} per .agents/profile.md § Automation PR policy (auto-merge / human-approved / manual decides who presses it), A declared expected_red test rides the trunk: before that PR, either .agents/testing.md § Merge gate allows a declared red on base, or quarantine those tests behind a declared skip that names the ticket (the case stays defect-found; the marker comes off when the fix ships) so base stays green. Then mirror to the TMS (update_execution with the gate outcome — automation executions ONLY, manual-qa's live runs are their own record — plus each case's status/coverage note: full | partial with the excluded steps and reasons, and the PR link) and run the close sweep. Replan anything not 'delivered'. Where the tokenomics scope contract is active (a session-start line named your session id): record outcomes as they land (work-scope.mjs outcome <ID>=delivered …), then work-scope.mjs close — it renders ${REPORT_DIR}/batch-report.md+.html and flags receipt DRIFT — and publish per .agents/profile.md § Reporting policy (dispatch the cheap publisher; no policy → the files ARE the report, flag the gap).`
       : merged.length && (!gate || gate.verdict === 'not-run' || gate.verdict === 'incomplete')
         // THE RECEIPT IS THE DELIVERABLE. Measured across two audits: leads
         // recover a failed gate flawlessly and then never correct report.json,

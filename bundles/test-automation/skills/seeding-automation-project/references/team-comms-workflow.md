@@ -4,8 +4,8 @@
 
 - [6.5a — Detect the installed hosts](#65a--detect-the-installed-hosts)
 - [6.5b — Enumerate installed personas](#65b--enumerate-installed-personas)
-- [6.5c — Write `.agents/team-comms.md` from templates](#65c--write-agentsteam-commsmd-from-templates)
-- [6.5d — Declare Copilot subagent capability (Copilot only)](#65d--declare-copilot-subagent-capability-copilot-only)
+- [6.5c — Write `.agents/team-comms.md` from the template](#65c--write-agentsteam-commsmd-from-the-template)
+- [6.5d — Check Copilot agent frontmatter (Copilot only)](#65d--check-copilot-agent-frontmatter-copilot-only)
 - [6.5e — Add the `team-comms.md` reference to agent "Project Context"](#65e--add-the-team-commsmd-reference-to-agent-project-context)
 - [6.5f — Idempotence](#65f--idempotence)
 
@@ -32,8 +32,8 @@ writes tailored content, every agent points at the same file.
 [ -d .windsurf/agents ] && have_windsurf=1
 ```
 
-A project can have more than one host — in that case, `team-comms.md`
-contains one section per host.
+A project can have more than one host — § Setup then lists them all;
+everything else in the file is host-neutral.
 
 ---
 
@@ -45,11 +45,11 @@ for `name` and `description`. Only list personas actually present.
 
 ---
 
-## 6.5c — Write `.agents/team-comms.md` from templates
+## 6.5c — Write `.agents/team-comms.md` from the template
 
-Use the templates in `team-comms-templates.md`. Pick the template(s)
-matching the detected host(s), fill in the enumerated roster, substitute
-`<YYYY-MM-DD>`, and write (or overwrite) `.agents/team-comms.md`.
+Use the one template in `team-comms-templates.md`: list every detected host
+in § Setup, fill in the enumerated roster, substitute `<YYYY-MM-DD>`, and
+write (or overwrite) `.agents/team-comms.md`.
 
 **Every generated file must start with the line:**
 
@@ -60,10 +60,6 @@ matching the detected host(s), fill in the enumerated roster, substitute
 This header is non-negotiable — it marks the file as scout-owned so that
 future seeds know it is safe to overwrite, and so human readers don't
 hand-edit content that will be clobbered.
-
-Multi-host projects (e.g. both Claude Code and Copilot installed)
-concatenate the matching host templates into a single file, with a one-line
-note at the top telling each runtime which section applies.
 
 ---
 

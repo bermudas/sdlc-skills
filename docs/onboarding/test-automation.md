@@ -29,9 +29,9 @@ User → test-automation-lead
                            any build)
   2. Route per unit      — execution-provider policy:
                            manual-qa-verified | needs-execution | combined
-  3. Build loop per unit — engineer (green once, coverage declaration in
-                           the spec) → fresh engineer-typed review (static)
-                           → merge back into the batch trunk
+  3. Build loop per unit — engineer (green N×, coverage declaration in
+                           the spec) → fresh engineer-typed review (case
+                           walk + one run) → merge back into the batch trunk
   4. Hardening gate      — once per batch: N× consecutive green on the
                            batch trunk + one blast-radius regression run
   5. Report + close      — one report, then merge + one TMS/tracker sweep
@@ -45,7 +45,7 @@ Role defaults (three agents; personas are assigned per `.agents/team-comms.md`):
 |---|---|---|
 | Orchestrator | `test-automation-lead` (Tal) | its own `AGENT.md` is the complete operating manual; `test-automation-workflow` is the reference library it opens by name |
 | Implementer | `test-automation-engineer` (Axel) | its own `AGENT.md` (six-phase loop, Hard Rules, Run Report); `test-automation-implementation` is the reference library |
-| Reviewer | **fresh** `test-automation-engineer`-typed dispatch | `code-review` + the reviewer contract — static case↔code walk, no execution; independence comes from clean context + the contract, not a different agent file |
+| Reviewer | **fresh** `test-automation-engineer`-typed dispatch | `code-review` + the reviewer contract — case↔code walk plus one run of the spec, edits nothing; independence comes from clean context + the contract, not a different agent file |
 | Hardening gate | fresh agent, dispatched by the lead (never the implementer that built, never the lead itself — a lead-run gate was the measured bottleneck) | once per batch, on the batch trunk — the merge signal; mechanics via `scripts/gate/gate-case.mjs` |
 
 `scout` (Kit) is the fourth file on disk but not a pipeline slot — it
@@ -126,6 +126,17 @@ claude --agent test-automation-lead  # Phase 2+ — drive the automation pipelin
 Inside that session you just talk to the agent ("onboard this repo", "automate
 TC-1234") — it stays the orchestrator for the whole session.
 
+**Models.** Keep the lead on a Sonnet-class model or better; the engineer slots
+(builder, reviewer, prover) may run on Haiku. Measured (ta-bench, 2026-09): the
+review stage is where a small model gains most (assertion strength 0.95 → 1.74),
+while a Haiku lead skipped the dispatch and wrote the tests itself in 63 % of runs.
+
+**Non-interactive (`claude -p …`).** A Workflow batch outlives the print session
+only with `CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0` in the environment — by
+default the session ends 10 minutes after the lead's last message and the running
+workflow is killed with it (measured 5 of 5). Synchronous per-unit dispatches
+need nothing.
+
 ### GitHub Copilot
 
 The installer writes Copilot's agents to `.github/agents/<name>.agent.md`, and
@@ -157,15 +168,20 @@ copilot --agent test-automation-lead --allow-all-tools \
 COPILOT_HOME=./.copilot copilot --agent test-automation-lead --yolo
 ```
 
-**MCP: the repo-root `.mcp.json` already works.** The CLI reads two sources —
-the repo-root `.mcp.json` as **workspace servers** (automatically, no flag) and
-its config dir's `mcp-config.json` as **user servers**. The config dir defaults
+**MCP: the repo-root `.mcp.json` is the file that counts.** The CLI reads two
+sources — the repo-root `.mcp.json` (or `.github/mcp.json`) as **workspace
+servers** (automatically, no flag) and its config dir's `mcp-config.json` as
+**user servers**. The config dir defaults
 to `~/.copilot` and also holds `agents/`, `skills/`, `hooks/`,
 `permissions-config.json` and session state
 ([GitHub's config-dir reference](https://docs.github.com/en/copilot/reference/copilot-cli-reference/cli-config-dir-reference));
-`COPILOT_HOME` relocates it, and this installer writes a repo-local
-`.copilot/mcp-config.json` for the Copilot target. Measured on 1.0.63 with
-marker servers:
+`COPILOT_HOME` relocates it. For the Copilot target this installer writes
+`.mcp.json` (the file the CLI reads; when the Claude target is installed too,
+Claude's copy of that file is left as is and serves both), `.vscode/mcp.json`
+(the VS Code extension) and `.copilot/mcp-config.json` (for
+`COPILOT_HOME=./.copilot`). Until 2026-09 it wrote only the last two, so a
+Copilot-only install had **no workspace MCP at all** on current CLIs. Measured on
+1.0.63 with marker servers:
 
 ```console
 $ copilot mcp list                          # repo-root .mcp.json — no flags needed
@@ -182,7 +198,8 @@ Workspace servers:
 So on a repo that also has the Claude target installed, the `.mcp.json` written
 for Claude is picked up by Copilot CLI for free, and `COPILOT_HOME` is not
 needed for MCP at all. `.vscode/mcp.json` is **not** read by the CLI — that file
-serves the VS Code extension only.
+serves the VS Code extension only (1.0.88 prints a migration notice when it is
+the only MCP file present).
 
 **One real gap, and it fails silently.** Claude's `.mcp.json` carries auth for
 secret-bearing HTTP/SSE servers in a `headersHelper` field — a shell command
@@ -623,8 +640,8 @@ Shape:
    automated test **is** the case's first execution.
 3. **Build (test-automation-engineer)** derives what to build straight
    from the case snapshot, writes the test in the existing framework, and
-   proves it green **once** locally (determinism is the hardening gate's
-   job) — with the **coverage declaration** in the spec: a comment block
+   proves it green **N** times locally (`§ Merge gate`, default 3 —
+   stabilising is the builder's job) — with the **coverage declaration** in the spec: a comment block
    `TC-<id> coverage: …` / `TC-<id> excluded: …`, exclusions only from the
    closed vocabulary (`covered-elsewhere` / `blocked-by-defect` /
    `un-automatable` / `by-seeded-policy`), each with a verifiable referent.
@@ -634,12 +651,12 @@ Shape:
    a PR opens.
 4. **Review (fresh engineer-typed dispatch + `code-review` + the reviewer
    contract)** walks the case step-by-step against the coverage
-   declaration — **static**, no execution — and touches every referent
+   declaration, runs the spec once, edits nothing — and touches every referent
    (runs the named covering test, opens the defect, checks the taxonomy,
    reads the policy line). Fix rounds until approved, then the unit merges
    back into the batch trunk.
 5. **Hardening gate (its own agent, once per batch)** — the merge
-   signal; neither the implementer's green-once nor the reviewer's
+   signal for a batch; neither the implementer's N greens nor the reviewer's
    `APPROVED` substitutes, and it is deliberately never the agent that
    wrote the code. The batch's specs run **together** on the trunk,
    requiring **N** consecutive deterministic GREEN (default 3) against

@@ -1,16 +1,18 @@
 # Reviewer slot contract — test-automation-workflow (static review)
 
 The reviewer's full procedure. Loaded on demand by the reviewer dispatch.
-This is a STATIC review: the reviewer does not execute the spec — independent
-execution belongs to the orchestrator's batch hardening gate (N× consecutive
-green). A project may re-enable a reviewer live run via
-`.agents/testing.md § Merge gate → reviewer live re-run: on`.
+The review is the case walked against the code plus **one run** of the unit's
+spec in a clean process: the walk answers "does green mean the case", the run
+answers "is it green as delivered". Neither fixes anything. A project may make
+the review static-only via `.agents/testing.md § Merge gate → reviewer run:
+off`; the batch hardening gate (N× consecutive on the trunk before it goes to
+base) stays the orchestrator's.
 
 ## Reviewer slot
 
 This section IS the reviewer-slot contract for test-automation PRs. When dispatched — by an orchestrator like `test-automation-lead`, or standalone for "review test PR #N" — role, context, parameters, and return shape are fixed here so dispatch prompts don't have to inline them. (Generic review mechanics — checklist categories, output format — live in the separate `code-review` skill, loaded alongside.)
 
-**Role.** Adversarial review of a test-automation PR. **You did NOT write this code** — that framing is mandatory; without it the review collapses into rubber-stamp. The reviewer is an **engineer-typed dispatch in the reviewer slot**: a fresh `test-automation-engineer` session that loads `code-review` plus this contract. Independence comes from the clean context and this contract, not from a different agent definition — the builder's session and the reviewer's share nothing but the repo. Default is a single reviewer; for a large batch the orchestrator may opt into a **multi-lens panel** — parallel reviewers on the one finished diff with distinct lenses (correctness / honesty-of-coverage / maintainability), unanimous APPROVED to pass.
+**Role.** Adversarial review of a test-automation PR. **You did NOT write this code** — that framing is mandatory; without it the review collapses into rubber-stamp. The reviewer is an **engineer-typed dispatch in the reviewer slot**: a fresh `test-automation-engineer` session that loads `code-review` plus this contract. Independence comes from the clean context and this contract, not from a different agent definition — the builder's session and the reviewer's share nothing but the repo. Default is a single reviewer; for a large batch the orchestrator may opt into a **multi-lens panel** — parallel reviewers on the one finished diff with distinct lenses (correctness / honesty-of-coverage / maintainability), unanimous APPROVED to pass. **You edit nothing on the branch you judge** — not a selector, not a page object, not a fixture or config; "I am the only engineer available" is not a reason. Findings travel in the verdict and the builder fixes them. Your only write is your own memory (below), in a commit that touches no test code.
 
 **Session context — read once at session start.** Typically auto-imported via your agent's `AGENT.md`; if not, read now:
 
@@ -27,13 +29,13 @@ Missing context → flag the gap; don't fabricate defaults.
 - PR ID / branch — the implementation
 - The intake screening verdicts — `.agents/estimation/<slug>-verdicts.json` (the exclusion budget)
 
-**Context economy (hard rules — same wording as the workflow PREAMBLE; keep in step).** The bill is resident-context × turns — every turn re-sends your whole context, so turn count and payload size ARE the cost. Batch independent tool calls into ONE message (read the case, the diff, and the verdicts together, never one tool per turn); read each artifact once and work from what you read (ranged reads for big files; no re-reads to double-check what is already in context); you are STATIC — you never run suites or a browser, so no runner output and no screenshots belong in your transcript. Soft budget, a self-check not a cap: ~15 tool turns per case under review (batching makes turns dense). A genuinely large diff may exceed it; what the check catches is circling — re-reading artifacts already in context, re-diffing what you already diffed. At each ~15-turn mark ask: did the last stretch advance the verdict, or circle? Advance → continue. Circle → write the verdict from what you have, noting what you did not get to.
+**Context economy (hard rules — same wording as the workflow PREAMBLE; keep in step).** The bill is resident-context × turns — every turn re-sends your whole context, so turn count and payload size ARE the cost. Batch independent tool calls into ONE message (read the case, the diff, and the verdicts together, never one tool per turn); read each artifact once and work from what you read (ranged reads for big files; no re-reads to double-check what is already in context); you run the unit's spec ONCE (line reporter, tail the failures) and never a browser, so no walkthroughs and no screenshots belong in your transcript. Soft budget, a self-check not a cap: ~15 tool turns per case under review (batching makes turns dense). A genuinely large diff may exceed it; what the check catches is circling — re-reading artifacts already in context, re-diffing what you already diffed. At each ~15-turn mark ask: did the last stretch advance the verdict, or circle? Advance → continue. Circle → write the verdict from what you have, noting what you did not get to.
 
 **Memory you write is a deliverable too.** A review that surfaces a durable gotcha (a pattern the suite keeps getting wrong, a coverage-walk trap) records it under `.agents/memory/<your-agent>/` and commits it **by exact path** on the branch under review before finishing — an additive `docs(memory):` commit that touches nothing in the test code, so the code diff you judged is unchanged. Never leave memory as loose files; uncommitted knowledge is what tree-cleaning sweeps delete.
 
 **Return contract:**
 
-- Verdict: `APPROVED` | `CHANGES_REQUESTED`
+- Verdict: `APPROVED` | `CHANGES_REQUESTED` — and the **last line** of your return is exactly `Verdict: APPROVED` or `Verdict: CHANGES_REQUESTED`, nothing after it (`APPROVE`, `GREEN 3/3`, `PROVEN` are not verdicts)
 - `blocking[]` — what must change before this can land. Everything else worth saying goes in findings.
 - Findings list with `file:line` refs (Critical / Important / Nit per the `code-review` skill's Output Format)
 - Coverage confirmation per case: `full` or `partial` with the excluded steps — this is what the report row and the TMS back-write carry
@@ -115,8 +117,11 @@ its prose:
   exists, at the claimed step, asserting the claimed observable, in a spec
   **merged on base** (a same-batch target, or a spec that merely exists, is
   `CHANGES_REQUESTED`).
-- `blocked-by-defect` — open the defect: it exists, it is open, and it matches
-  the excluded step.
+- `blocked-by-defect` — open the defect: it exists, it is open, it matches
+  the excluded step, and that step truly cannot be exercised (the screen
+  never renders, the API answers 500). A step that could have run and would
+  have failed is not excludable — it is asserted, red, and the unit is
+  `defect-found`.
 - `un-automatable` — the category is in automation-scoping's complexity
   taxonomy AND the intake verdict for this case supports it (below).
 - `by-seeded-policy` — read the named policy line in `.agents/testing.md`; it
@@ -140,13 +145,25 @@ id it was built from; a `needs-execution` unit cites the runner's PASS result.
 Provenance missing where the route requires it is a finding — the gate proves
 the code, but the provenance is what says the *case* was ever observed live.
 
-**Drift is filed, never absorbed.** The case is upstream input — TA never
-edits it. Where the live product demonstrably diverges from the case text
-(reverse-masking guard: asserting stale case text against live-correct product
-is masking in the other direction), the divergence is a `clarification`
-finding for the case's author, and the code asserts the live truth with the
-divergence noted. Where the code diverges from the case with no such grounds,
-it is `CHANGES_REQUESTED`.
+**Deviation from the case is declared and judged, never absorbed.** The case
+is upstream input — TA never edits it. Where the code departs from the case's
+literal text, the builder must have declared it (spec comment + Run Report),
+and the departure is one of three:
+
+- a **path adaptation** — the control under another name, a changed route, a
+  new interstitial, reworded copy for the same observable. Acceptable when
+  declared and carrying a `clarification` for the case's author; a tester
+  following the case by hand would have made the same move.
+- a **substituted target** — the control the case names exists and did not do
+  what the case says, so the code acts on a different control (or asserts a
+  different observable) that "works". `CHANGES_REQUESTED`, always, however
+  green the run: that observation is a defect and belongs on the builder's
+  red path (file it, keep the test on the named control), not in a locator
+  comment. "The product is consistent with itself" is not grounds.
+- an **ambiguity** — two plausible targets or outcomes. A `clarification`
+  before the build, never the builder's guess.
+
+An undeclared departure of any kind is `CHANGES_REQUESTED`.
 
 This anchor governs pipeline PRs born from a case. For a **technical unit** —
 tech-debt, a migration, a config or reporting fix dispatched on a
@@ -173,15 +190,21 @@ of a case.
 - Selector stability (locator ladder per `.agents/testing.md`; handles traced
   to the surface cache / manual-qa knowledge / live observation, not guessed)
 - Defect masking — bi-directional: no `test.fail`/`xit`/weakened assertions
-  away from defects (the sanctioned form is a `blocked-by-defect` exclusion
-  with the ticket id); no assertions held to stale case-text against
-  live-correct product. **One sanctioned exception: a carve quarantine** — a
+  away from defects (the sanctioned form is a filed defect and the test left
+  red on the step the case demands — `defect-found`; `blocked-by-defect`
+  only for a step that cannot be exercised); no substituted target (above). **One sanctioned exception: a carve quarantine** — a
   skip marker the split path ordered, whose reason quotes the blocker and
   names the unit, on a case recorded `blocked`. The hunt's target is a silent
   skip beneath a case claiming `delivered`; a declared quarantine claims
-  nothing. Verify the declaration statically (marker present, reason quotes
-  the blocker — the gate's run is what shows it skipped) — do not order its
-  deletion.
+  nothing. Verify the marker and its quoted reason; your run shows it skipped — do
+  not order its deletion.
+- **Action target** — each step's action lands on the control the case names
+  (§ Deviation, above); a decisive step re-aimed at another control because
+  the named one "did not work" is `CHANGES_REQUESTED` and a defect to file,
+  however green the run.
+- **Nothing outside the repository** — the test depends on no file a browser
+  or MCP session created (`.playwright-mcp/uploads/…`), nothing in `/tmp` or
+  the home directory; test data is in the repo or the system under test.
 - POM discipline (no raw selectors in spec files; additive-only on
   shared-caller files — test-automation-implementation § Hard Rules → 3)
 - Naming + dead code
@@ -189,4 +212,4 @@ of a case.
   observable could have been asserted read-only on stable data, flag for
   refactor (test-automation-implementation § Hard Rules → 10)
 
-Verdict: `APPROVED` | `CHANGES_REQUESTED` with file:line findings. Findings go back to the builder; the orchestrator decides ship-vs-amend.
+Verdict: `APPROVED` | `CHANGES_REQUESTED` with file:line findings. Findings go back to the builder; the orchestrator decides ship-vs-amend. Close on the exact verdict line, nothing after it.

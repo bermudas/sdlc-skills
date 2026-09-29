@@ -46,19 +46,22 @@ User launches Tal → drops cases, a story with acceptance criteria, or a
                         → the unit STAYS needs-execution (never silently
                         self-execute when policy says manual-qa)
   Build, one unit at a time on its own branch (per `.agents/workflow.md`):
-          engineer green once, PR open per § Automation PR policy, coverage
-          declaration in the spec.
+          engineer green N consecutive runs (§ Merge gate, default 3), PR open
+          per § Automation PR policy, coverage declaration in the spec.
           Combined: the first green run of the automated test IS the case's
           first execution; the engineer may walk a new surface live first,
           files a defect if the scenario does not work, probes once cached —
           locator ladder: surface cache → manual-qa knowledge (read-only) →
           the case file → live probe. Learned handles go back to the cache.
-  Review: fresh engineer-typed dispatch, STATIC — walks the case step-by-step
-          against the coverage declaration; fix rounds until approved
-  Prove — its own agent, never the implementer: the unit's specs N consecutive
-          green (default 3) + the specs a modified symbol reaches, once + CI
-          selection check
-  Merge per policy → mirror tracker/TMS → next unit. Report once per batch.
+  Review: fresh engineer-typed dispatch — walks the case step-by-step against
+          the coverage declaration and runs the spec once; edits nothing; fix
+          rounds go through the lead until approved
+  Prove (batch only) — its own agent, none of the builders: the batch's specs
+          together N consecutive green on the trunk + the specs a modified
+          symbol reaches, once + CI selection check. A single unit is proven
+          by its builder's N runs and the reviewer's run.
+  Merge per policy → mirror tracker/TMS → next unit. A batch trunk gets one
+          gate before base. Report once per batch, as a file.
   (Claude Code, when a batch is asked to run as a workflow: same loop on a
    batch trunk with one report — `test-automation-workflow` accelerant)
 ```
@@ -87,12 +90,19 @@ User launches Tal → drops cases, a story with acceptance criteria, or a
   reference it, never copy (copies drift).
 - **No defect masking.** `test.fail()`, `xit()`, `@Ignore`, `pytest.skip()`,
   and weakened assertions for product defects are forbidden. A product bug
-  means file a ticket, then declare it: a step-isolated defect becomes a
-  `blocked-by-defect: <ticket>` exclusion in the coverage block (spec stays
-  honestly green, `coverage: partial`); a case-blocking defect is the
-  `defect-found` outcome. `expect.soft()` + `// Known defect` with a declared
-  `expected_red[]` only where the seed asks for a visible red — never a
-  hidden green.
+  means file a ticket, keep the assertion the case demands and let the test
+  fail on that step, write the remaining steps honestly, return
+  `defect-found`; the PR is parked with its ticket and lands with no rewrite
+  when the fix ships. `blocked-by-defect: <ticket>` excludes only a step that
+  cannot be exercised at all — never one that fails, never to turn a red into
+  a green. And never re-aimed: the decisive step acts on the control
+  the case names; a named control that does not do what the case says is a
+  defect (ticket + red test), not a reason to drive a neighbouring control
+  that "works". A path adaptation — a renamed button, a changed route, a
+  new interstitial, reworded copy for the same observable — is fine when
+  declared in the spec and the Run Report and filed as a `clarification`;
+  "the product is consistent with itself" never overrides the case.
+  Reviewers edit nothing on the branch they judge.
 - **Reuse to travel and to know — never to conclude.** Reuse the suite to
   REACH areas fast and the surface cache to KNOW handles — but a coverage
   judgment stands on the automated test's own green run against the real
@@ -102,7 +112,7 @@ User launches Tal → drops cases, a story with acceptance criteria, or a
   --update` changes the disk, not a running lead's context. After any update:
   finish or park the in-flight batch, then start a fresh session.
 - **One unit, one synchronous dispatch, one Run Report — on every host.** The
-  lead runs the per-unit loop itself (route → build → review → gate → merge);
+  lead runs the per-unit loop itself (route → build → review → merge; one gate per batch trunk);
   a batch is that loop N times. On Claude Code the shipped workflow scripts
   (`batch-build` / `batch-campaign` under `test-automation-workflow`;
   `batch-integrate` and `batch-stabilize` are repair tools) run the same loop
@@ -120,12 +130,21 @@ User launches Tal → drops cases, a story with acceptance criteria, or a
   units, never retried with the same prompt.
 - **Dispatch is the work.** A routing turn without an actual subagent dispatch
   in the same reply did nothing.
+- **Everything of yours is inside this repository.** Skills, agent files and
+  reference docs sit in this project's host directories (the hooks name the
+  absolute paths at start); never search `/`, `~` or another project for
+  them — a referenced file that is missing is reported missing, not hunted.
+  A browser tool's page tree comes from its snapshot call, never from a
+  `.playwright-mcp/*.yml` link.
+- **The batch report is a file.** `.agents/automation/<slug>/report.md`, one
+  row per unit, written before the lead's last message; that message carries
+  the path and the outcome column, not the report.
 - **Tool-call economy.** Independent tool calls go out together in one
   message — one `git show <sha>` for a whole diff, one grep with alternation,
   one ranged `sed`, no `ls`-probing before the real command. Measured: the same
   review took 14 tool calls batched and 36 sequential.
-- **Done means delivered AND tracked.** A `delivered` case is clean-green
-  through the gate with a valid coverage declaration; a masked green is
+- **Done means delivered AND tracked.** A `delivered` case is green N times under its builder, green once more
+  under review, merged with a valid coverage declaration; a masked green is
   `blocked`.
 - **TMS-agnostic; back-write is dual-write.** The adapter skill loads only
   when the project declares it (e.g. `tms.adapter: xray` → `xray-testing`).

@@ -135,14 +135,15 @@ cheaper than a missed clarification.
 
 Three places, each with a job:
 
-- **The spec** — `// Known defect: <TICKET>` beside the `expect.soft()`
-  (isolated), and for an excluded step the coverage declaration's
-  `blocked-by-defect` line with the ticket id as its referent
-  (SKILL.md § Coverage declaration).
-- **The Run Report** — the ticket ID, filing style, and the handling
-  (soft-expect for isolated, natural-fail for blocking); a soft-expected
-  defect is also declared in `expected_red[]`.
+- **The spec** — `// Known defect: <TICKET>` beside the assertion the case
+  demands, which stays exactly as written and fails; the remaining steps are
+  implemented honestly after it. Only a step that cannot be exercised at all
+  gets a `blocked-by-defect` line in the coverage declaration, with the
+  ticket id as its referent (coverage-contract.md).
+- **The Run Report** — the ticket ID, the filing style, the failing step, and
+  the outcome `defect-found`; in a batch workflow the red test is also
+  declared in the return's `expected_red[]` so the gate runs it without
+  counting it.
 - Under `bundle-per-case`, reference both the umbrella ticket ID and the
   comment anchor so a reader can find the specific note (e.g. "Known
-  defect: JIRA SCRUM-BUG-42 comment-3 — soft-expect", or "Known defect:
-  GH#234 — natural-fail").
+  defect: JIRA SCRUM-BUG-42 comment-3", or "Known defect: GH#234").

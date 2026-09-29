@@ -26,7 +26,7 @@ Do not re-author it per session — invoke it:
 
 ```
 Workflow({
-  scriptPath: "<installed skill dir>/scripts/workflows/batch-build.workflow.mjs",
+  scriptPath: ".claude/skills/test-automation-workflow/scripts/workflows/batch-build.workflow.mjs",  // the installed skill, inside this project — never a search
   args: {
     slug: "<batch-slug>",                  // required — names the run's dir under .agents/automation/
     base: "origin/main",                   // required
@@ -216,6 +216,14 @@ each time with the suite still running happily in the background.
    `run_in_background` completion notification and the Monitor tool lose that
    race. There is no waking — which also rules out polling a CI run across
    turns.
+3. **`claude -p` (print mode) waits for background subagents and Workflows only
+   up to `CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS`** — default 10 minutes, `0` =
+   wait for them. A batch launched from a non-interactive session is killed
+   exactly at that ceiling after the lead's last message (measured 5 of 5 on a
+   4-case batch; with the ceiling lifted the same batch completed 5 of 5). Set
+   the variable in the environment of any CI or scripted run that uses the
+   Workflow tool; interactive sessions and synchronous `Agent` dispatches are
+   unaffected.
 
 What *does* work, from the same probe: **blocking foreground `sleep`**. Three
 45-second sleeps ran untouched. So a job longer than one call is launched

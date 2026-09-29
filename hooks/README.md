@@ -14,6 +14,7 @@ they re-fire on `clear`/`compact`/`resume`, and they run on every runtime.
 | `.agents/memory/<role>/snapshot.md` | `agent-start` | per agent, every dispatch |
 | Lean shared docs: `role-overrides.md`, `profile.md`, `workflow.md`, `testing.md`, `conventions.md`, `team-comms.md` | `session-start` (parent session) **and** `agent-start` (each subagent) | per session / per dispatch; re-injected on clear/compact |
 | Roster reminder → `memory` skill | `session-start` | only on Cursor & Kiro (no context-injecting per-agent hook) |
+| Install locations — absolute `<project>/<hostdir>/skills/<id>/`, `agents/`, `.agents/` (every host dir present, plus a plugin root) and "never search `/` or `~`" | `session-start` (`--agent` sessions) **and** `agent-start` | role-bearing sessions and every dispatch; ~300 bytes inside the cap. Why: agents hunted for their own libraries with `find /` / `ls ~/.claude/skills` (ta-bench, 2026-09-23) — a body rule did not stop the first reflex, an absolute path in context does |
 
 A dispatched subagent gets a fresh context that does **not** inherit the parent's
 `SessionStart` injection, so `agent-start` delivers the shared docs to each

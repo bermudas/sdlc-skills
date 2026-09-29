@@ -280,9 +280,10 @@ can verify and leave the rest out (templates in `references/templates.md`
   (manual-qa convention); record the project's concrete env var
   (e.g. `BASE_URL`) so generated code and test-runner dispatches
   resolve it identically.
-- **§ Merge gate** — N consecutive green runs the gate requires before a
-  unit merges (default 3 when absent); raise it for suites with known
-  parallel-interaction flakes, never lower it below 2.
+- **§ Merge gate** — N consecutive green runs: the builder stabilises to N
+  before handoff, the batch gate requires N on the trunk (default 3 when
+  absent); raise it for suites with known parallel-interaction flakes, never
+  lower it below 2. `Reviewer run: on` is the default.
 - **§ Case ownership** — `manual-qa | automation`. Who may edit the case
   files: `manual-qa` (or absent → read-only for TA) when manual-qa is
   installed or the cases come from a TMS; `automation` when the team that
@@ -304,12 +305,12 @@ can verify and leave the rest out (templates in `references/templates.md`
 ## Step 6.5 — Generate .agents/team-comms.md
 
 Every project gets a scout-generated `.agents/team-comms.md` that
-names the host, the installed personas, and the exact invocation syntax.
+names the host(s), the installed personas, and how work is handed off (one call to the host's subagent tool, by roster name).
 
-**Full procedure** — host detection, persona enumeration, template
-selection, Copilot capability declaration, idempotence rules — lives
+**Full procedure** — host detection, persona enumeration, the single
+template, the Copilot frontmatter check, idempotence rules — lives
 in **[references/team-comms-workflow.md](references/team-comms-workflow.md)**.
-Templates live in
+The template lives in
 **[references/team-comms-templates.md](references/team-comms-templates.md)**.
 
 ## Step 6.6 — Generate .agents/test-automation.yaml
