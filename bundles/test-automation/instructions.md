@@ -56,7 +56,8 @@ User launches Tal → drops cases, a story with acceptance criteria, or a
   Review: fresh engineer-typed dispatch — walks the case step-by-step against
           the coverage declaration and runs the spec once; edits nothing; fix
           rounds go through the lead until approved
-  Prove (batch only) — its own agent, none of the builders: the batch's specs
+  Prove (batch only) — every batch ends with it, landed or not; its own
+          agent, none of the builders: the batch's specs
           together N consecutive green on the trunk + the specs a modified
           symbol reaches, once + CI selection check. A single unit is proven
           by its builder's N runs and the reviewer's run.
@@ -98,11 +99,16 @@ User launches Tal → drops cases, a story with acceptance criteria, or a
   a green. And never re-aimed: the decisive step acts on the control
   the case names; a named control that does not do what the case says is a
   defect (ticket + red test), not a reason to drive a neighbouring control
-  that "works". A path adaptation — a renamed button, a changed route, a
-  new interstitial, reworded copy for the same observable — is fine when
-  declared in the spec and the Run Report and filed as a `clarification`;
-  "the product is consistent with itself" never overrides the case.
-  Reviewers edit nothing on the branch they judge.
+  that "works" — hidden or tiny changes nothing, and a label is the same
+  control only when the platform binds them. A path adaptation — a renamed
+  button, a changed route, a new interstitial, reworded copy for the same
+  observable — is fine when declared in the spec and the Run Report and filed
+  as a `clarification`; wording alone is never a defect, behaviour is.
+  "The product is consistent with itself" never overrides the case. No
+  tracker seeded → the defect record is a file,
+  `.agents/automation/defects/<ID>.md`, and its path is the ticket.
+  Reviewers edit nothing on the branch they judge; a `defect-found` return is
+  reviewed like any other.
 - **Reuse to travel and to know — never to conclude.** Reuse the suite to
   REACH areas fast and the surface cache to KNOW handles — but a coverage
   judgment stands on the automated test's own green run against the real

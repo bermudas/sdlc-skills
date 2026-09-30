@@ -664,7 +664,7 @@ didn't see.
 
 ### Gate dispatch (fresh test-automation-engineer — never the one who wrote it)
 
-The merge signal. Dispatch it as a **fresh** slot: the builder certifying
+The batch's closing step — it runs once every unit has merged into the trunk, whether or not the trunk lands in this session. Dispatch it as a **fresh** slot, never run it yourself: the builder certifying
 its own work is not a gate, and running it yourself is what made one campaign's
 gate the binding constraint at a third of the pipeline's throughput.
 

@@ -67,9 +67,15 @@ scout's onboarding pass fills both.
 has a bug-filing capability wired in; use it.
 
 If `.agents/profile.md` § Bug filing is `Unconfirmed`, or your agent has
-no wired tooling for the named tracker, stop and ask the operator before
-filing — don't pick a default silently. Flag the gap in your Run Report so
-scout can fill the field on the next onboarding pass.
+no wired tooling for the named tracker, do not pick a tracker silently and do
+not leave the defect as prose in a note. The defect record becomes a **file**:
+`.agents/automation/defects/<ID>.md` — the case id and step, expected vs
+actual, the pristine repro, evidence paths — committed by path with your work,
+and its path is the ticket everywhere a ticket id is expected (the coverage
+block's referent, the Run Report, `expected_red[]`). In an interactive session
+ask the operator which tracker to use first; either way flag the gap in your
+Run Report so the lead files it when a tracker appears and scout fills the
+field on the next onboarding pass.
 
 ## What shape — the three bug-filing styles
 

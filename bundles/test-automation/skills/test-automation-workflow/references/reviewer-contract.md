@@ -117,7 +117,9 @@ its prose:
   exists, at the claimed step, asserting the claimed observable, in a spec
   **merged on base** (a same-batch target, or a spec that merely exists, is
   `CHANGES_REQUESTED`).
-- `blocked-by-defect` — open the defect: it exists, it is open, it matches
+- `blocked-by-defect` — open the defect (a ticket, or the defect record file
+  `.agents/automation/defects/<ID>.md` where the seed names no tracker; an id
+  that resolves to neither is not a referent): it exists, it is open, it matches
   the excluded step, and that step truly cannot be exercised (the screen
   never renders, the API answers 500). A step that could have run and would
   have failed is not excludable — it is asserted, red, and the unit is
@@ -153,13 +155,24 @@ and the departure is one of three:
 - a **path adaptation** — the control under another name, a changed route, a
   new interstitial, reworded copy for the same observable. Acceptable when
   declared and carrying a `clarification` for the case's author; a tester
-  following the case by hand would have made the same move.
+  following the case by hand would have made the same move. Wording alone is
+  never a defect: the test asserts the live text and the `clarification`
+  carries both wordings. The reverse is a **stale assertion** — an assertion
+  on wording the product does not show, filed as `defect-found` — and it is
+  `CHANGES_REQUESTED` unless a spec or acceptance criterion fixes that
+  wording.
 - a **substituted target** — the control the case names exists and did not do
   what the case says, so the code acts on a different control (or asserts a
   different observable) that "works". `CHANGES_REQUESTED`, always, however
   green the run: that observation is a defect and belongs on the builder's
   red path (file it, keep the test on the named control), not in a locator
-  comment. "The product is consistent with itself" is not grounds.
+  comment. "The product is consistent with itself" is not grounds. The
+  boundary is technical, not intuitive: a label, wrapper or alternative
+  locator is the same control only when the platform binds them (`for`/`id`,
+  a wrapping label, an accessible name); a hidden or tiny control is still
+  the named control; and the builder's own note that the named control did
+  nothing when operated directly is the defect report — a green test beside
+  that note is this bullet.
 - an **ambiguity** — two plausible targets or outcomes. A `clarification`
   before the build, never the builder's guess.
 
@@ -186,7 +199,14 @@ of a case.
   [`coverage-contract.md`](coverage-contract.md) § Layer 1, and the project's
   idiom (`.agents/testing.md § Coverage idiom`) is followed. The gate greps
   this too; you are the one who catches a block that parses but lies.
-- Assertion strength (no demoted expects, no missing `toBeEnabled` guards)
+- Assertion strength (no demoted expects, no missing `toBeEnabled` guards;
+  every assertion can fail — a title matching `/.+/`, visibility of an
+  always-present container, `not.toBeVisible` on an element that never
+  existed distinguish nothing and are silent gaps)
+- **Declared defect, green test** — when the case, a sibling case, an intake
+  note or the builder's own notes say a control is broken and the test on it
+  is green, block until the test is red on that control or the fix is
+  evidenced.
 - Selector stability (locator ladder per `.agents/testing.md`; handles traced
   to the surface cache / manual-qa knowledge / live observation, not guessed)
 - Defect masking — bi-directional: no `test.fail`/`xit`/weakened assertions

@@ -329,7 +329,7 @@ transcripts for API, metric summaries for perf — but the tree and the
 
 ## Hardening gate — run shape
 
-The gate slot proves a batch trunk before it goes to base. It fixes nothing and
+The gate slot proves a batch trunk once every unit has merged into it — every batch ends with it, whether or not the trunk lands in this session. It fixes nothing and
 classifies nothing; it runs and reports. Mechanics are scripted in
 `scripts/gate/gate-case.mjs` (fetches, checks the branch out here, merges base
 FIRST, runs the suite command N times with timings, refuses only dirt on the

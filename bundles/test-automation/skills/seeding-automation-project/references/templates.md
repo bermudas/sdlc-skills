@@ -636,7 +636,7 @@ docs rather than restating them.
 
 ## Merge gate
 - **N:** <consecutive green runs — the builder stabilises to N before
-  handoff and the batch gate requires N on the trunk before it goes to base;
+  handoff and the batch gate requires N on the trunk at the end of every batch;
   default 3 when absent — raise for suites with parallel-interaction
   flakes, never below 2>
 
@@ -659,6 +659,11 @@ docs rather than restating them.
   <!-- UI suites only — also flag headless vs headed, viewport; omit for API / perf / mobile projects -->
 
 ## Structure
+<!-- On Claude Code the lead guard reads every backticked path in this section
+     as part of the test tree the lead may not edit (defaults: tests/, e2e/,
+     src/test/, framework configs, package files). Name EVERY root the framework
+     uses — stories, step definitions, fixtures, the framework config — so a
+     Vividus, qavajs, Robot or .NET layout is guarded too. -->
 - **Tests live in:** `tests/` / `e2e/` / `cypress/e2e/` /
   `src/test/java/` / …
 - **Folder roles** (one line each — omit folders that don't exist; don't
