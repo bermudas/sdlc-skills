@@ -23,7 +23,8 @@
  *      GitHub Copilot CLI target (--target copilot) flattens agents to
  *      `.github/agents/<name>.agent.md` (not a directory) with SOUL.md
  *      appended as a `## Persona` section, and rewrites `model: sonnet`
- *      → `model: Claude Sonnet 5` (Copilot's picker display name). The
+ *      → `model: [Claude Sonnet 5.5, Claude Sonnet 5]` (Copilot's picker
+ *      display names, newest first — see COPILOT_MODEL_NAMES). The
  *      Codex target assigns each role a concrete Codex (GPT) model by name.
  *      Other targets keep the directory layout and the authored model.
  *
@@ -94,15 +95,37 @@ const TARGETS = [
   { id: "codex", dir: ".codex", label: "Codex" },
 ];
 
-// GitHub Copilot's model picker lists Claude models by display name
-// ("Claude Sonnet 5"), not by a dashed provider id. Copilot agent frontmatter
-// must match that display name, so the Copilot flatten path maps each authored
-// `model:` alias through this table.
-const COPILOT_MODEL_NAMES = {
-  sonnet: "Claude Sonnet 5",
-  opus: "Claude Opus 5",
-  haiku: "Claude Haiku 4.5",
+// GitHub Copilot has no "latest Sonnet" alias, so the installer resolves the
+// authored tier at install time: each alias maps to the newest display names
+// we know, newest first. Facts this rests on (verified 2026-10-07, Copilot
+// CLI 1.0.88 live + VS Code 1.137 / Copilot Chat 0.65 source):
+//   - A custom agent's `model:` is matched by display name ("Claude Sonnet 5.5"
+//     → claude-sonnet-5.5) on both hosts; VS Code also accepts the qualified
+//     "<name> (copilot)" form. Dashed ids work on the CLI only.
+//   - `model: sonnet` / `claude-sonnet` / `claude-sonnet-latest` resolve on
+//     NEITHER host's agent frontmatter. The CLI's `sonnet` family alias exists
+//     only as the session model setting and routed to a non-Claude model in
+//     the probe; VS Code maps the Claude alias `sonnet` to a frozen older
+//     Sonnet. Neither is "latest".
+//   - A list is tried in order on VS Code (documented); the CLI accepts the
+//     list syntax and uses the first entry, falling back only to the user's
+//     default model (with a warning) when that entry is not available — its
+//     changelog promises in-order fallback, the 1.0.88 build does not do it.
+// So the list below is: newest first (what both hosts run today), older
+// siblings behind it (a real fallback on VS Code, a no-op on the CLI). An
+// `init --update` rewrites the pin when a release bumps this table.
+export const COPILOT_MODEL_NAMES = {
+  sonnet: ["Claude Sonnet 5.5", "Claude Sonnet 5"],
+  opus: ["Claude Opus 5.5", "Claude Opus 5"],
+  haiku: ["Claude Haiku 4.5"],
 };
+
+/** The `model:` value a Copilot agent file gets for an authored alias — one name, or a YAML flow list newest first. */
+export function copilotModelValue(alias) {
+  const names = COPILOT_MODEL_NAMES[alias];
+  if (!names) return null;
+  return names.length > 1 ? `[${names.join(", ")}]` : names[0];
+}
 
 // Codex is an OpenAI host, so a Claude model (alias or dashed id) is unusable
 // there. The Codex flatten path ignores the authored `model:` tier and assigns
@@ -1955,12 +1978,12 @@ function transformAgentForCopilot(
   );
 
   if (normalizeModel) {
-    // Copilot's model picker keys off display names ("Claude Sonnet 5"),
-    // not the dashed provider id — shipping `model: sonnet` leaves it unable
-    // to resolve. Map the alias to Copilot's display name (COPILOT_MODEL_NAMES).
+    // Copilot resolves an agent's model by display name, not by the alias —
+    // shipping `model: sonnet` makes the CLI fall back to the user's default
+    // model with a warning. Map the alias through COPILOT_MODEL_NAMES.
     agent = agent.replace(
       /^model:\s*(sonnet|opus|haiku)\s*$/m,
-      (_, alias) => `model: ${COPILOT_MODEL_NAMES[alias]}`,
+      (_, alias) => `model: ${copilotModelValue(alias)}`,
     );
   }
 
@@ -2350,8 +2373,9 @@ function printFixCopilotHelp() {
                   reference to \`<name>.soul.md\`
 
     --no-normalize-model    Keep 'model: sonnet' as-is (default: rewrite
-                            to 'model: Claude Sonnet 5' — Copilot's
-                            model-picker display name)
+                            to 'model: [Claude Sonnet 5.5, Claude Sonnet 5]'
+                            — Copilot's model-picker display names, newest
+                            first)
     -h, --help              Show this help
 `);
 }

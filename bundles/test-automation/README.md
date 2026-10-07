@@ -147,7 +147,11 @@ do not count; without the opt-in the hooks are skipped silently (only a
 `--log-level debug` line says so). In the VS Code extension, pick the agent in
 the chat panel and switch the session to auto-approve/bypass first. Whatever
 the host, keep the lead on a Sonnet-class model; the engineer slots may run on
-Haiku.
+Haiku. On Copilot the installer resolves `model: sonnet` to the newest display
+names it knows (`[Claude Sonnet 5.5, Claude Sonnet 5]`) — Copilot has no
+"latest" alias, so `init --update` is how a new Sonnet reaches your agents,
+and a pinned model your account cannot use makes the CLI fall back to your
+default model with a warning, not an error.
 Full per-host detail: [onboarding § Launching the agents](../../docs/onboarding/test-automation.md#launching-the-agents--run-them-as-your-main-agent).
 
 **Before Phase 1 — two prerequisites.** scout's tool-wiring inspects the

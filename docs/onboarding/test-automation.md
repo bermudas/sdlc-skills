@@ -137,6 +137,26 @@ Use the lead when the work spans several surfaces or will not fit one session.
 review stage is where a small model gains most (assertion strength 0.95 → 1.74),
 while a Haiku lead skipped the dispatch and wrote the tests itself in 63 % of runs.
 
+**Models on Copilot — the pin is resolved at install time.** The agents are
+authored with Claude Code's tier alias (`model: sonnet` = the newest Sonnet
+there). Copilot has no such alias: a custom agent's `model:` is matched by
+display name on both the CLI and VS Code, `sonnet` / `claude-sonnet-latest`
+resolve to nothing, and the CLI's `sonnet` *session* setting routes like Auto
+(a non-Claude model in our probe). So the Copilot installer rewrites the alias
+to Copilot's display names, newest first — `model: [Claude Sonnet 5.5, Claude
+Sonnet 5]`: VS Code tries the list in order; CLI 1.0.88 uses the first entry
+(its changelog promises in-order fallback, the build does not deliver it yet).
+Two consequences: when a release bumps the table, `init --update` re-pins your
+agents; and when the pinned model is **not enabled for your account**, the CLI
+does not fail — it prints `Warning: Custom agent "…" specifies model "…" which is
+not available; using "<your default model>" instead` and runs the lead on
+whatever your default is (verified: a `gpt-5-mini` default). Check once with
+`copilot --model claude-sonnet-5.5 -p "ok"`, or set your default model to a
+Claude model so the fallback stays in the family. The pin also beats the
+session's `--model` — a lead launched with `--model claude-sonnet-5 --agent
+test-automation-lead` runs on the pinned 5.5; drop the pin from the agent file
+if you want the session model to govern.
+
 **Non-interactive (`claude -p …`).** A Workflow batch outlives the print session
 only with `CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0` in the environment — by
 default the session ends 10 minutes after the lead's last message and the running
