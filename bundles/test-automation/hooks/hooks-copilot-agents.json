@@ -1,0 +1,13 @@
+{
+  "test-automation-lead": {
+    "PreToolUse": [
+      {
+        "type": "command",
+        "bash": "\"./.github/hooks/test-automation/run-hook.cmd\" lead-guard pretooluse",
+        "powershell": "& \"./.github/hooks/test-automation/run-hook.cmd\" lead-guard pretooluse",
+        "env": { "SDLC_VSCODE": "1", "SDLC_HOOK_ROLE": "test-automation-lead" },
+        "timeout": 10
+      }
+    ]
+  }
+}

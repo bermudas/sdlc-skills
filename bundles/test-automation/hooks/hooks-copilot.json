@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "hooks": {
+    "preToolUse": [
+      {
+        "type": "command",
+        "bash": "\"./.github/hooks/test-automation/run-hook.cmd\" lead-guard pretooluse",
+        "powershell": "& \"./.github/hooks/test-automation/run-hook.cmd\" lead-guard pretooluse",
+        "env": { "COPILOT_CLI": "1" },
+        "timeoutSec": 10
+      }
+    ]
+  }
+}

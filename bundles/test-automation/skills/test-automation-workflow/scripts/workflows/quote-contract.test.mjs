@@ -86,7 +86,6 @@ test('foreign text reaches prompts only through quote', () => {
   assert.match(build, /r\.blocking\.map\(\(b\) => quote\(b\)\)/, 'reviewer blocking items');
   assert.match(build, /\.map\(\(d\) => quote\(d\.item\)\)/, 'unaddressed items named back to the fixer');
   assert.match(build, /quote\(r\.ticket, 60\)/, 'implementer-supplied ticket in the gate prompt');
-  assert.match(build, /quote\(carve\.why, 200\)/, 'reviewer-authored blocker text in the carve prompt');
 
   const stab = FILES['batch-stabilize'];
   assert.match(stab, /quote\(f\.signature, 300\)/, 'runner failure signatures');

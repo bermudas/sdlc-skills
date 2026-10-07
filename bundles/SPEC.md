@@ -18,7 +18,7 @@ A factory composes five things:
 | **Skills** | auto-pulled from each agent's `skills:` + `skills-on-demand:` frontmatter (both install; only `skills:` enters standing context — on-demand entries are installed on disk only and loaded when the agent's prose calls for one), plus any team-wide extras the factory declares; factory-local skills live under `factories/<id>/skills/` |
 | **Instructions** | a team-level guidance file the factory ships |
 | **Briefings** | per-role *stack overlays* the factory seeds into each role's memory |
-| **Hooks** | IDE automation (Claude `settings.json`), v1 Claude-only |
+| **Hooks** | IDE automation — Claude `settings.json`; Copilot `.github/hooks/<id>.json` + per-agent frontmatter hooks (VS Code) |
 
 ## Why overlays, not forked agents
 
@@ -101,11 +101,21 @@ factories/<id>/
 ├── briefings/
 │   └── <role>.md            optional — per-role stack overlay
 │                            → .agents/memory/<role>/project_briefing.md
-├── hooks/                   optional — Claude settings.json automation
-│   ├── hooks.json            hook config fragment (event → command)
+├── hooks/                   optional — hook automation
+│   ├── hooks.json            Claude hooks object (event → matcher-groups), merged into settings.json
+│   ├── hooks-copilot.json    optional — Copilot `{version, hooks}` file, written to .github/hooks/<id>.json
+│   ├── hooks-copilot-agents.json  optional — `{ "<agent>": { "<Event>": [entries] } }`, spliced into
+│   │                            that agent's .github/agents/<agent>.agent.md frontmatter (VS Code reads it)
 │   └── scripts/              scripts the hooks invoke (chmod +x on install)
 ├── agents/                  optional — agents this factory owns (real copies; same id may differ from other factories)
-│   └── <name>/               installed like a global agent (AGENT.md + SOUL.md)
+│   └── <name>/               installed like a global agent (AGENT.md + SOUL.md [+ RULES.md])
+│                            AGENT.md is the role's complete operating manual (standing
+│                            context on every host). RULES.md is optional and only a
+│                            dispatch-injection ECHO: when its header comment says
+│                            "copied verbatim from AGENT.md", validate-factories fails
+│                            on any line not found verbatim in AGENT.md; the installer
+│                            copies it beside SOUL.md into .agents/memory/<name>/ on
+│                            Copilot so the shared hooks inject it there too.
 └── skills/                  optional — skills this factory owns (real copies)
     └── <name>/               installed like a monorepo skill (SKILL.md + references/scripts)
 ```
@@ -192,7 +202,7 @@ leaves the item discoverable.
   "hooks": "hooks/hooks.json",               // optional, relative path
   "localAgents": [],                         // agents this factory owns (under factories/<id>/agents/)
   "localSkills": [],                         // skills this factory owns (under factories/<id>/skills/; no skills.json entry needed)
-  "targets": ["claude"]                      // IDE targets that get HOOKS (agents/skills/briefings install everywhere)
+  "targets": ["claude", "copilot"]           // IDE targets that get HOOKS (agents/skills/briefings install everywhere)
 }
 ```
 
@@ -235,16 +245,20 @@ leaves the item discoverable.
    `seeding-a-project` / `seeding-automation-project` skills preserve
    `<!-- FACTORY:* -->` blocks (legacy `<!-- BUNDLE:* -->` included) verbatim,
    so a factory's conventions survive onboarding.
-4. **Hooks** — for each target in `targets ∩ installed targets`, merge
-   `hooks/hooks.json` into `<target>/settings.json` under `hooks` (tagged
-   entries, merge-not-clobber, back up first); copy `hooks/scripts/` and
-   `chmod +x`. Non-Claude targets are skipped with a notice (v1).
+4. **Hooks** — for each target in `targets ∩ installed targets`: Claude —
+   merge `hooks/hooks.json` into `.claude/settings.json` under `hooks` (tagged
+   entries, merge-not-clobber, back up first); Copilot — write
+   `hooks/hooks-copilot.json` to `.github/hooks/<id>.json` wholesale and splice
+   `hooks/hooks-copilot-agents.json` into the named agents' `.agent.md`
+   frontmatter (idempotent). Either way copy `hooks/scripts/` to
+   `<target>/hooks/<id>/` and `chmod +x`. A factory without the Copilot files
+   installs no Copilot hooks; Cursor/Windsurf are skipped with a notice.
 
-## Hooks (`hooks/hooks.json`)
+## Hooks (`hooks/hooks.json`, `hooks/hooks-copilot.json`, `hooks/hooks-copilot-agents.json`)
 
-v1 is **Claude-only** (Cursor/Windsurf/Copilot hook formats differ and are
-skipped with a notice). `hooks.json` is a standard Claude hooks object —
-event name → matcher-groups:
+Claude Code and GitHub Copilot (CLI + VS Code Copilot Chat) are supported;
+Cursor/Windsurf hook formats differ and are skipped with a notice. `hooks.json`
+is a standard Claude hooks object — event name → matcher-groups:
 
 ```jsonc
 {
@@ -273,8 +287,33 @@ On install:
 - `settings.json` is backed up to `settings.json.bak` before any change. If
   it fails to parse, it's left untouched and the merge is skipped.
 
-The `feature-development` factory does not ship hooks yet — the merge
-machinery is in place; concrete hooks (format-on-edit, etc.) come later.
+**Copilot.** Two optional siblings next to `hooks.json`, used only when
+`targets` includes `copilot` and the install targets Copilot:
+
+- `hooks-copilot.json` — the engine's own hooks file, `{ "version": 1,
+  "hooks": { "<event>": [entries] } }` with camelCase CLI event names
+  (`preToolUse`, `sessionStart`, …) and entries of `type`, `bash`,
+  `powershell`, optional `env`, `timeoutSec` — the same format as the core
+  `.github/hooks/sdlc-skills.json`. Written **wholesale** to
+  `.github/hooks/<factory-id>.json` (an sdlc-owned file, so no merge). Both the
+  CLI and VS Code Copilot Chat read it; commands are project-relative
+  (`"./.github/hooks/<factory-id>/<script>"`), because Copilot runs hooks with
+  the project as cwd. A PascalCase event (`SubagentStart`) is inert in the CLI
+  and fires only in VS Code — see the core installer's notes.
+- `hooks-copilot-agents.json` — `{ "<agent>": { "<Event>": [entries] } }`
+  (PascalCase events; same entry shape with `timeout`). Spliced into that
+  agent's `.github/agents/<agent>.agent.md` frontmatter `hooks:` block,
+  idempotently (an entry whose `bash` is already present is not re-added),
+  after the SessionStart hook every Copilot agent already carries. This is the
+  **agent-scoped** lever for VS Code: a subagent runs the workspace hooks plus
+  its own file's, so an entry here fires only on that agent's calls. The CLI
+  ignores frontmatter hooks. An agent named here but not installed is skipped
+  with a notice.
+
+Only `test-automation` ships Copilot hooks today (the lead's write guard; see
+its `hooks/README.md`). The `feature-development` factory does not ship hooks
+yet — the merge machinery is in place; concrete hooks (format-on-edit, etc.)
+come later.
 
 ## Coexistence (installing several factories into one repo)
 

@@ -328,6 +328,58 @@ test('SOUL.md is injected on Claude, not only under Copilot', () => {
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
 
+// --- Copilot dialect: one hooks-copilot.json entry, two engines ---------------
+// The COPILOT_CLI=1 entries are run by the Copilot CLI (reads top-level
+// additionalContext, camelCase payload) AND by VS Code's native chat loop (reads
+// only hookSpecificOutput, Claude-dialect payload with hook_event_name). The
+// payload, not the flag, decides the shape.
+test('COPILOT_CLI entry + CLI payload (agentName) → top-level additionalContext', () => {
+  const dir = project({ role: 'tech-lead', memory: { 'snapshot.md': 'cli snapshot' } });
+  try {
+    const out = execFileSync('bash', [HOOK], {
+      input: JSON.stringify({ sessionId: 's1', agentName: 'tech-lead' }),
+      env: { ...process.env, COPILOT_PROJECT_DIR: dir, COPILOT_CLI: '1' },
+      encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'],
+    });
+    const j = JSON.parse(out);
+    assert.match(j.additionalContext, /cli snapshot/);
+    assert.equal(j.hookSpecificOutput, undefined);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('COPILOT_CLI entry + VS Code payload (hook_event_name) → hookSpecificOutput', () => {
+  const dir = project({ role: 'tech-lead', memory: { 'snapshot.md': 'vscode snapshot' } });
+  try {
+    const out = execFileSync('bash', [HOOK], {
+      input: JSON.stringify({ hook_event_name: 'SubagentStart', agent_type: 'tech-lead', session_id: 's1' }),
+      env: { ...process.env, COPILOT_PROJECT_DIR: dir, COPILOT_CLI: '1' },
+      encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'],
+    });
+    const j = JSON.parse(out);
+    assert.equal(j.hookSpecificOutput.hookEventName, 'SubagentStart');
+    assert.match(j.hookSpecificOutput.additionalContext, /vscode snapshot/);
+    assert.equal(j.additionalContext, undefined);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('session-start: COPILOT_CLI entry answers in the shape the payload dialect implies', () => {
+  const dir = project({ role: 'tech-lead', memory: { 'MEMORY.md': index(4000) } }); // forces a <memory-budget> block
+  try {
+    const runWith = (input) => spawnSync('bash', [SESSION_HOOK], {
+      input: JSON.stringify(input),
+      env: { ...process.env, COPILOT_PROJECT_DIR: dir, COPILOT_CLI: '1' },
+      encoding: 'utf8',
+    }).stdout;
+    const cli = JSON.parse(runWith({ source: 'new', sessionId: 'nope', cwd: dir }));
+    assert.match(cli.additionalContext, /memory-budget/);
+    assert.equal(cli.hookSpecificOutput, undefined);
+    const vscode = JSON.parse(runWith({ hook_event_name: 'SessionStart', source: 'new', session_id: 'nope', cwd: dir }));
+    assert.equal(vscode.hookSpecificOutput.hookEventName, 'SessionStart');
+    assert.match(vscode.hookSpecificOutput.additionalContext, /memory-budget/);
+    assert.equal(vscode.additionalContext, undefined);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
 test('SOUL.md is still injected under Copilot', () => {
   const dir = project({ role: 'tech-lead', memory: { 'SOUL.md': 'I am Rio, and I block on flaws.' } });
   try {
@@ -346,5 +398,61 @@ test('SOUL.md is found in the agent directory, not just the memory dir', () => {
     writeFileSync(join(agentDir, 'SOUL.md'), 'persona from the agent dir');
     const out = run(dir, 'tech-lead');
     assert.match(out, /persona from the agent dir/);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+// Install locations. Field evidence (ta-bench, 2026-09-23): leads and engineers
+// ran `find / -maxdepth 6`, `ls ~/.claude/skills` and `find ~/.claude` hunting for
+// their own libraries and agent files — nothing in context said the directory.
+// The block names the absolute install dirs; a body rule alone did not stop the
+// first `find /` (5/5 probes), the injected path did (3/3).
+function withHostDir(dir, hostdir = '.claude') {
+  mkdirSync(join(dir, hostdir, 'skills', 'memory'), { recursive: true });
+  mkdirSync(join(dir, hostdir, 'agents', 'qa-engineer'), { recursive: true });
+  return dir;
+}
+
+test('install locations: a dispatched role gets the absolute skills/agents dirs and the no-search rule', () => {
+  const dir = withHostDir(project({ memory: { 'MEMORY.md': index(3) } }));
+  try {
+    const out = run(dir, 'qa-engineer');
+    assert.match(out, /Installed with you/);
+    assert.ok(out.includes(`${dir}/.claude/skills/<id>/`), 'absolute skills dir named');
+    assert.ok(out.includes(`${dir}/.claude/agents/`), 'absolute agents dir named');
+    assert.ok(!out.includes('agents//'), 'the agents path is printed once, not concatenated twice');
+    assert.match(out, /Agent files: [^.]*\/\.claude\/agents\/\. Shared project context/);
+    assert.match(out, /not for a tool output file, not for a cache, not for the product source/);
+    assert.match(out, /never search \/ or ~/);
+    assert.ok(out.indexOf('Installed with you') < out.indexOf('Entry 0'), 'block comes before the memory');
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('install locations: every host dir present is listed, a bare project lists none', () => {
+  const both = withHostDir(withHostDir(project({ memory: { 'MEMORY.md': index(2) } })), '.github');
+  const bare = project({ memory: { 'MEMORY.md': index(2) } });
+  try {
+    const out = run(both, 'qa-engineer');
+    assert.ok(out.includes(`${both}/.claude/skills/<id>/`) && out.includes(`${both}/.github/skills/<id>/`));
+    const none = run(bare, 'qa-engineer');
+    assert.doesNotMatch(none, /Installed with you/);
+    assert.match(none, /Entry 0/);                  // memory still flows
+  } finally {
+    rmSync(both, { recursive: true, force: true });
+    rmSync(bare, { recursive: true, force: true });
+  }
+});
+
+test('install locations: session-start injects it for a --agent session, not for a plain one', () => {
+  const dir = withHostDir(project({ memory: { 'MEMORY.md': index(2) }, shared: { testing: '# testing' } }));
+  const session = (env) => spawnSync('bash', [SESSION_HOOK], {
+    input: JSON.stringify({ hook_event_name: 'SessionStart', source: 'startup' }),
+    env: { ...process.env, CLAUDE_PROJECT_DIR: dir, ...env },
+    encoding: 'utf8',
+  }).stdout ?? '';
+  try {
+    assert.match(session({ CLAUDE_CODE_AGENT: 'qa-engineer' }), /Installed with you/);
+    const plain = session({ CLAUDE_CODE_AGENT: '' });
+    assert.doesNotMatch(plain, /Installed with you/);
+    assert.match(plain, /testing/);                 // shared docs still injected
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });

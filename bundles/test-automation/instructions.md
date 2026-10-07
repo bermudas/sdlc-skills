@@ -30,10 +30,11 @@ and `.agents/`, which always win over this file.
 ## The pipeline
 
 ```
-User launches Tal → drops a batch of cases (a single case is a batch of one)
-  Intake: one TMS/tasks sweep, dedup, case snapshots to
-          `.agents/automation/<slug>/cases/<ID>.md`, clustering + sizing —
-          un-automatable / already-covered verdicts are made HERE
+User launches Tal → drops cases, a story with acceptance criteria, or a
+  tech task (a single unit is a batch of one)
+  Take in: read in full, dedup, snapshot external bodies to
+          `.agents/automation/<slug>/cases/<ID>.md`, size each unit —
+          un-automatable / already-covered verdicts are made HERE by Tal
   Route per unit — from `.agents/testing.md § Execution provider`:
           self      → combined (everything)
           manual-qa → manual-qa-verified: PASS run record + authored case
@@ -44,18 +45,27 @@ User launches Tal → drops a batch of cases (a single case is a batch of one)
                         defect-found; BLOCKED → blocked; dispatch impossible
                         → the unit STAYS needs-execution (never silently
                         self-execute when policy says manual-qa)
-  Build, one unit at a time on a branch cut from the batch trunk:
-          engineer green once, PR open, coverage declaration in the spec.
+  Build, one unit at a time on its own branch (per `.agents/workflow.md`):
+          engineer green N consecutive runs (§ Merge gate, default 3), PR open
+          per § Automation PR policy, coverage declaration in the spec.
           Combined: the first green run of the automated test IS the case's
-          first execution; live probing is targeted investigation only —
+          first execution; the engineer may walk a new surface live first,
+          files a defect if the scenario does not work, probes once cached —
           locator ladder: surface cache → manual-qa knowledge (read-only) →
           the case file → live probe. Learned handles go back to the cache.
-  Review: fresh engineer-typed dispatch, STATIC — walks the case step-by-step
-          against the coverage declaration; fix rounds until approved
-  Merge back into the batch trunk; tree returns to the trunk → next unit
-  Gate — its own agent, never the implementer: the batch's specs together,
-          N consecutive green (default 3) + one blast-radius regression run
-  Report → Tal closes: merges, routes findings, ONE TMS back-write, replans
+  Review: fresh engineer-typed dispatch — walks the case step-by-step against
+          the coverage declaration and runs the spec once; edits nothing; fix
+          rounds go through the lead until approved
+  Prove (two or more units) — every such batch ends with it, landed or
+          not; its own agent, none of the builders: the batch's specs
+          together N consecutive green on the trunk + the specs a modified
+          symbol reaches, once + CI selection check. An ask packed into ONE unit
+          (one case, or up to five cases on one surface) is proven
+          by its builder's N runs and the reviewer's run.
+  Merge per policy → mirror tracker/TMS → next unit. A batch trunk gets one
+          gate before base. Report once per batch, as a file.
+  (Claude Code, when a batch is asked to run as a workflow: same loop on a
+   batch trunk with one report — `test-automation-workflow` accelerant)
 ```
 
 ## Working agreements (team-wide)
@@ -72,7 +82,9 @@ User launches Tal → drops a batch of cases (a single case is a batch of one)
 - **Cases are read-only.** Two sources of truth: the case (TMS or `tasks/`
   file — TA never edits it) and the code.
 - **Execution provider is policy, not preference.** `self` → combined;
-  `manual-qa` → verified/needs-execution as above. Never fall back to
+  `manual-qa` → verified/needs-execution as above. Absent from `.agents/testing.md` (seeded by
+  another factory's scout, or by hand) → `self`; the lead flags the gap and
+  adds the section at close. Never fall back to
   self-execution silently when policy says manual-qa.
 - **manual-qa's area is a read-only warm start.** `tasks/`, `reports/`,
   `.agents/manual-qa/` — read and reference, never write. Before writing an
@@ -80,28 +92,69 @@ User launches Tal → drops a batch of cases (a single case is a batch of one)
   reference it, never copy (copies drift).
 - **No defect masking.** `test.fail()`, `xit()`, `@Ignore`, `pytest.skip()`,
   and weakened assertions for product defects are forbidden. A product bug
-  means file a ticket and either `expect.soft()` (isolated, ticketed) or a
-  natural fail (`blocked`) — never a hidden green.
+  means file a ticket, keep the assertion the case demands and let the test
+  fail on that step, write the remaining steps honestly, return
+  `defect-found`; the PR is parked with its ticket and lands with no rewrite
+  when the fix ships. `blocked-by-defect: <ticket>` excludes only a step that
+  cannot be exercised at all — never one that fails, never to turn a red into
+  a green. And never re-aimed: the decisive step acts on the control
+  the case names; a named control that does not do what the case says is a
+  defect (ticket + red test), not a reason to drive a neighbouring control
+  that "works". The named control is the one a user operates: a test stays
+  on the part a person would click or type into, and a broken part behind it
+  (an input its label is not bound to, mouse works and keyboard does not) is
+  always filed as a defect, never left as a comment. A path adaptation — a renamed
+  button, a changed route, a new interstitial, reworded copy for the same
+  observable — is fine when declared in the spec and the Run Report and filed
+  as a `clarification`; wording alone is never a defect, behaviour is.
+  "The product is consistent with itself" never overrides the case. No
+  tracker seeded → the defect record is a file,
+  `.agents/automation/defects/<ID>.md`, and its path is the ticket.
+  Reviewers edit nothing on the branch they judge; a `defect-found` return is
+  reviewed like any other.
 - **Reuse to travel and to know — never to conclude.** Reuse the suite to
   REACH areas fast and the surface cache to KNOW handles — but a coverage
   judgment stands on the automated test's own green run against the real
-  system. `covered-elsewhere` may point only at a test merged to base or on
-  this batch's trunk, by name.
+  system. `covered-elsewhere` may point only at a test merged to base, by name
+  (a project may widen this in `.agents/testing.md § Coverage idiom`).
 - **A factory install/update reaches NEW sessions only.** `npx … init
   --update` changes the disk, not a running lead's context. After any update:
   finish or park the in-flight batch, then start a fresh session.
-- **Workflows are the default batch path on Claude Code — standing opt-in.**
-  A batch of ANY size — one case included — runs via the shipped batch
-  workflows (`batch-build` / `batch-campaign` under `test-automation-workflow`;
-  `batch-integrate` and `batch-stabilize` are repair tools). Installing this
-  factory and handing the lead a batch IS the multi-agent orchestration opt-in
-  the Workflow tool's gate requires; the lead does not re-litigate it. Fall
-  back to sequential dispatches only for the cases in
-  `references/workflow-accelerant.md` § When NOT to use it.
+- **One unit, one synchronous dispatch, one Run Report — on every host.** The
+  lead runs the per-unit loop itself (route → build → review → merge; one gate per batch trunk);
+  a batch is that loop N times. On Claude Code the shipped workflow scripts
+  (`batch-build` / `batch-campaign` under `test-automation-workflow`;
+  `batch-integrate` and `batch-stabilize` are repair tools) run the same loop
+  faster **when the user or the seed asks for a batch workflow** — installing
+  this factory is the multi-agent opt-in the Workflow tool asks for, so the
+  lead does not re-litigate it. Nothing about the contract changes off Claude
+  Code, only who executes the loop.
+- **Nothing wakes a waiting agent.** No host sends a notification when a
+  background job or a subagent finishes. Wait only inside a blocking call
+  (`sleep 300` polls with a 600 s timeout); a turn that ends with "I'll wait"
+  ended with nothing delivered. Images stay on disk: text first, a picture only when it answers what text
+  cannot, never the same screenshot twice, well under the host cap of 20 per
+  dispatch;
+  a dispatch that dies on a context or image limit is split into smaller
+  units, never retried with the same prompt.
 - **Dispatch is the work.** A routing turn without an actual subagent dispatch
   in the same reply did nothing.
-- **Done means delivered AND tracked.** A `delivered` case is clean-green
-  through the gate with a valid coverage declaration; a masked green is
+- **Everything of yours is inside this repository.** Skills, agent files and
+  reference docs sit in this project's host directories (the hooks name the
+  absolute paths at start). Never run a search or listing rooted at `/`, `~`
+  or another project — for anything: not a library, not a tool's output
+  file, not a cache, not the product's source. A file a tool mentions
+  (`.playwright-mcp/…`) is under the project root; what is not inside the
+  project is reported missing, not hunted.
+- **The batch report is a file.** `.agents/automation/<slug>/report.md`, one
+  row per unit, written before the lead's last message; that message carries
+  the path and the outcome column, not the report.
+- **Tool-call economy.** Independent tool calls go out together in one
+  message — one `git show <sha>` for a whole diff, one grep with alternation,
+  one ranged `sed`, no `ls`-probing before the real command. Measured: the same
+  review took 14 tool calls batched and 36 sequential.
+- **Done means delivered AND tracked.** A `delivered` case is green N times under its builder, green once more
+  under review, merged with a valid coverage declaration; a masked green is
   `blocked`.
 - **TMS-agnostic; back-write is dual-write.** The adapter skill loads only
   when the project declares it (e.g. `tms.adapter: xray` → `xray-testing`).

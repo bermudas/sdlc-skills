@@ -74,9 +74,9 @@ Standard flow when the caller is filing a new defect:
    the tracker's create command. For `separate-ticket`, target the
    project named in § Bug filing target.
 4. Return the ticket ID and URL to the caller. What the caller does
-   with that ID (note in the spec's coverage block (a `blocked-by-defect`
-   exclusion), attach to a test, link in a PR
-   body) is caller policy, not this skill's concern.
+   with that ID (a `// Known defect: <TICKET>` comment beside the red
+   assertion, a `blocked-by-defect` exclusion for a step that cannot be
+   exercised, a link in a PR body) is caller policy, not this skill's concern.
 
 This skill files tickets and posts/queries/closes them. It does **not**
 own the in-flight comment language a developer posts while *fixing*

@@ -1,4 +1,27 @@
 {
+  "PreToolUse": [
+    {
+      "matcher": "Write|Edit|MultiEdit|NotebookEdit|Bash",
+      "hooks": [
+        {
+          "type": "command",
+          "command": "\"${CLAUDE_PROJECT_DIR}/.claude/hooks/test-automation/run-hook.cmd\" lead-guard pretooluse",
+          "timeout": 10
+        }
+      ]
+    }
+  ],
+  "Stop": [
+    {
+      "hooks": [
+        {
+          "type": "command",
+          "command": "\"${CLAUDE_PROJECT_DIR}/.claude/hooks/test-automation/run-hook.cmd\" lead-guard stop",
+          "timeout": 20
+        }
+      ]
+    }
+  ],
   "SubagentStop": [
     {
       "matcher": "test-automation-engineer|test-automation-lead|test-runner",

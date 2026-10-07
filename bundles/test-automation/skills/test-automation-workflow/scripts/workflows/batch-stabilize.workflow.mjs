@@ -82,32 +82,17 @@ const quote = (s, max = 400) => String(s ?? '')
   .slice(0, max)
 
 const PREAMBLE =
-  'You are dispatched from the batch-stabilize workflow. If your role memory / ' +
-  'project briefing / .agents/*.md digests are not already in your context, load ' +
-  'them now (memory skill; read the files). Confirm your slot contract is ' +
-  'PRESENT before touching anything — by CHECKING your context (preloaded ' +
-  'skills are already there); re-invoking the Skill tool for a skill you ' +
-  'already carry pastes a duplicate copy. ' +
-  'Anything worth telling someone that did not stop you goes in findings[] — do ' +
-  'not write it to memory yourself; the report is what gets read. ' +
-  // Same measured facts as batch-build's FOREGROUND_RULE: a turn ended mid-job
-  // is forced to report 28ms later (no wake, by any pattern), a foreground call
-  // is capped at 600s, and a blocking sleep is the legal — and cheap — way to
-  // wait. The re-gate slot is the exposed one here: running the suite N
-  // consecutive times is the longest job in this workflow.
-  'LONG JOBS — test suites especially. A foreground call is killed at its `timeout` ' +
-  '(default 120s, MAXIMUM 600000ms), so ALWAYS pass timeout: 600000 on a suite run, ' +
-  'and let the call block when the job fits inside it. ' +
-  'When the job does NOT fit in one call: launch it detached, writing its output to a file, ' +
-  'then WAIT with blocking foreground polls — ONE `sleep <n>; <tail the output file>` per call, each with ' +
-  'timeout: 600000 — until it is done. Sleeping in the foreground is legal and cheap: it is ONE turn ' +
-  'however long you sleep. Make the FIRST poll short (~60-120s) — a run that dies in its first minute ' +
-  'must not cost a five-minute blind sleep — then settle at ~`sleep 300`. NEVER chain sleeps inside one ' +
-  'call (`sleep 120; tail; sleep 240; tail`): the chain outlives the call cap and is killed at its own ' +
-  'timeout, taking the tail you already read with it — one sleep, one look, return, repeat. ' +
-  'NEVER end a turn while a job is running — nothing will wake you (measured: forced to report 28ms ' +
-  'later, and neither run_in_background nor Monitor beats that) and this workflow blocks on your return. ' +
-  'NEVER poll at second-level intervals — you pay a full context per turn and a busy-wait gets you cut off.'
+  'Dispatched from the batch-stabilize workflow. Load your role memory and the .agents/*.md digests if they are not in your ' +
+  'context (memory skill; read the files). Libraries live in .claude/skills/<id>/ inside this project — open one only at the ' +
+  'step that names it, never re-invoking a skill you already carry, never searching / or ~. ' +
+  'Anything worth telling someone that did not stop you goes in findings[] — the report is what gets read. ' +
+  // The same three harness facts as batch-build's FOREGROUND_RULE; the re-gate
+  // slot is the exposed one here — N consecutive suite runs is its whole job.
+  'LONG JOBS: a foreground call is killed at its `timeout` (default 120s, max 600000ms) — pass timeout: 600000 on a suite run ' +
+  'and let it block when the job fits. When it does not fit: run it detached to a file and wait with blocking polls, ONE ' +
+  '`sleep <n>; <tail the file>` per call (first poll ~60-120s, then `sleep 300`), never chaining sleeps in one call. ' +
+  'NEVER end a turn while a job is running — nothing will wake you and this workflow blocks on your return; ' +
+  'NEVER poll at second-level intervals — every turn re-sends your whole context.'
 
 const FINDINGS = {
   type: 'array',

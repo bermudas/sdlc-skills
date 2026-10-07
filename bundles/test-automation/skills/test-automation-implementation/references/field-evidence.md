@@ -38,8 +38,8 @@ tool call per turn before the batching rule; 15 batched turns carry what
 **The wholesale-clean incident (2026-08-03).** One
 `git stash --include-untracked` before a `git checkout` swept six freshly
 written memory entries and three receipts; every later agent ran without
-them. Role memory is gitignored and returns live on the telemetry side
-today, but your own uncommitted work is just as exposed as ever — anything
+them. Role memory is committed by exact path by default (a project may gitignore
+it as its own choice), but anything not yet committed is exposed — anything
 plain-untracked (a surface-cache note just written, a spec mid-edit)
 vanishes with no diff and no error.
 
