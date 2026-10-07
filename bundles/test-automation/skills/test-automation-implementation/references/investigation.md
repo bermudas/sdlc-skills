@@ -44,7 +44,12 @@ Don't go live to:
    the real screen.
 4. **Targeted live probing** — Playwright MCP, `browser-verify` for computed
    styles / CDP, or whatever tool fits the surface. Minutes, not a
-   walkthrough: answer the question, capture the handle, get out.
+   walkthrough: answer the question, capture the handle, get out. The page
+   tree comes from the tool's snapshot call — a `[Snapshot](.playwright-mcp/…yml)`
+   link is a file under the project root, written after the reply; never hunt
+   for it. An `evaluate` returns at once: no waits or event-promises inside it
+   (a silent call is killed only after 30 minutes on Claude Code — the slot is
+   lost with it).
 
 Write-back rule: rung-4 results go INTO the surface cache; rung-2 results are
 **referenced, never copied** (§ The surface cache → anti-duplication). Every

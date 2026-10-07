@@ -67,9 +67,15 @@ scout's onboarding pass fills both.
 has a bug-filing capability wired in; use it.
 
 If `.agents/profile.md` § Bug filing is `Unconfirmed`, or your agent has
-no wired tooling for the named tracker, stop and ask the operator before
-filing — don't pick a default silently. Flag the gap in your Run Report so
-scout can fill the field on the next onboarding pass.
+no wired tooling for the named tracker, do not pick a tracker silently and do
+not leave the defect as prose in a note. The defect record becomes a **file**:
+`.agents/automation/defects/<ID>.md` — the case id and step, expected vs
+actual, the pristine repro, evidence paths — committed by path with your work,
+and its path is the ticket everywhere a ticket id is expected (the coverage
+block's referent, the Run Report, `expected_red[]`). In an interactive session
+ask the operator which tracker to use first; either way flag the gap in your
+Run Report so the lead files it when a tracker appears and scout fills the
+field on the next onboarding pass.
 
 ## What shape — the three bug-filing styles
 
@@ -133,16 +139,28 @@ cheaper than a missed clarification.
 
 ## Recording the finding in your deliverable
 
-Three places, each with a job:
+Three places, each with a job. A defect the case's own path exercises leaves the
+test red on that step (`defect-found`). A defect in a part of the control the
+user's path does not touch — an input its label is not bound to, keyboard
+operation broken while the mouse works — leaves the test green on the user's
+path and is filed all the same: the unit is `delivered` and carries the defect
+as a `defect` finding in the Run Report — the element the case names, the part
+the test operates, the record — with `// Known defect: <TICKET>` beside the
+locator instead of beside a failing assertion. A Run Report that says only
+`delivered` has masked it; the reviewer blocks. And the user's path is the one
+the case names, mode included: a step written as Tab and Space is not exercised
+by a click on the label — that click is a substituted target, and the keyboard
+failure is the red test.
 
-- **The spec** — `// Known defect: <TICKET>` beside the `expect.soft()`
-  (isolated), and for an excluded step the coverage declaration's
-  `blocked-by-defect` line with the ticket id as its referent
-  (SKILL.md § Coverage declaration).
-- **The Run Report** — the ticket ID, filing style, and the handling
-  (soft-expect for isolated, natural-fail for blocking); a soft-expected
-  defect is also declared in `expected_red[]`.
+- **The spec** — `// Known defect: <TICKET>` beside the assertion the case
+  demands, which stays exactly as written and fails; the remaining steps are
+  implemented honestly after it. Only a step that cannot be exercised at all
+  gets a `blocked-by-defect` line in the coverage declaration, with the
+  ticket id as its referent (coverage-contract.md).
+- **The Run Report** — the ticket ID, the filing style, the failing step, and
+  the outcome `defect-found`; in a batch workflow the red test is also
+  declared in the return's `expected_red[]` so the gate runs it without
+  counting it.
 - Under `bundle-per-case`, reference both the umbrella ticket ID and the
   comment anchor so a reader can find the specific note (e.g. "Known
-  defect: JIRA SCRUM-BUG-42 comment-3 — soft-expect", or "Known defect:
-  GH#234 — natural-fail").
+  defect: JIRA SCRUM-BUG-42 comment-3", or "Known defect: GH#234").

@@ -42,16 +42,19 @@ blocking at review and at the gate.
 
 | Category | Required referent |
 |---|---|
-| `covered-elsewhere` | name of the existing test that asserts it |
-| `blocked-by-defect` | filed defect id |
+| `covered-elsewhere` | name of an existing test **merged to base** that asserts the same observable (a project may widen the scope in `.agents/testing.md § Coverage idiom`) |
+| `blocked-by-defect` | filed defect id — or, where the seed names no tracker, the path of the defect record `.agents/automation/defects/<ID>.md`; an id that resolves to neither is invalid grammar |
 | `un-automatable` | category from automation-scoping's complexity taxonomy |
 | `by-seeded-policy` | the policy line in `.agents/testing.md` |
 
-`blocked-by-defect` is also how a known, ticketed defect rides a delivered
-spec: the blocked step is excluded against the defect id, the rest of the case
-automates with `coverage: partial`, and the spec stays honestly green — the
-declaration replaces every masking device (`test.fail()`, skip markers,
-weakened assertions), which remain forbidden.
+`blocked-by-defect` excludes a step that cannot be exercised at all because
+of a filed defect — the screen behind it never renders, the API it needs
+answers 500. A step that CAN be exercised and fails is never excluded: it
+stays asserted as the case demands, the test is red, the unit's outcome is
+`defect-found`, and the ticket rides the Run Report and the PR until the fix
+ships (then the test lands unchanged). Excluding a failing step to keep the
+spec green is masking with paperwork; every masking device (`test.fail()`,
+skip markers, weakened assertions) stays forbidden.
 
 ## Layer 2 — idiom (project-owned)
 

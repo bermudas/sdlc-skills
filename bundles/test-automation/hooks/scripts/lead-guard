@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+# PreToolUse / Stop guard for the test-automation lead — thin launcher.
+# All logic and tests live in lead-guard.mjs; this exists because the factory
+# installer copies hooks/scripts/ and Claude Code invokes an extensionless
+# command through run-hook.cmd.
+#
+#   lead-guard pretooluse   deny a lead write into the test tree
+#   lead-guard stop         block a batch that ends without a report file
+#
+# Unlike workflow-return, STDOUT MATTERS here: the decision JSON goes to the
+# host. Stdin is the hook payload and is passed straight through. Fail open:
+# no node, or anything unexpected → exit 0 with no output.
+set -uo pipefail
+DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+command -v node >/dev/null 2>&1 || exit 0
+node "$DIR/lead-guard.mjs" "${1:-}" 2>/dev/null
+exit 0

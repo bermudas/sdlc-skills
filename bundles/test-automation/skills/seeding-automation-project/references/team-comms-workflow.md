@@ -4,8 +4,8 @@
 
 - [6.5a — Detect the installed hosts](#65a--detect-the-installed-hosts)
 - [6.5b — Enumerate installed personas](#65b--enumerate-installed-personas)
-- [6.5c — Write `.agents/team-comms.md` from templates](#65c--write-agentsteam-commsmd-from-templates)
-- [6.5d — Declare Copilot subagent capability (Copilot only)](#65d--declare-copilot-subagent-capability-copilot-only)
+- [6.5c — Write `.agents/team-comms.md` from the template](#65c--write-agentsteam-commsmd-from-the-template)
+- [6.5d — Check Copilot agent frontmatter (Copilot only)](#65d--check-copilot-agent-frontmatter-copilot-only)
 - [6.5e — Add the `team-comms.md` reference to agent "Project Context"](#65e--add-the-team-commsmd-reference-to-agent-project-context)
 - [6.5f — Idempotence](#65f--idempotence)
 
@@ -32,8 +32,8 @@ writes tailored content, every agent points at the same file.
 [ -d .windsurf/agents ] && have_windsurf=1
 ```
 
-A project can have more than one host — in that case, `team-comms.md`
-contains one section per host.
+A project can have more than one host — § Setup then lists them all;
+everything else in the file is host-neutral.
 
 ---
 
@@ -45,11 +45,11 @@ for `name` and `description`. Only list personas actually present.
 
 ---
 
-## 6.5c — Write `.agents/team-comms.md` from templates
+## 6.5c — Write `.agents/team-comms.md` from the template
 
-Use the templates in `team-comms-templates.md`. Pick the template(s)
-matching the detected host(s), fill in the enumerated roster, substitute
-`<YYYY-MM-DD>`, and write (or overwrite) `.agents/team-comms.md`.
+Use the one template in `team-comms-templates.md`: list every detected host
+in § Setup, fill in the enumerated roster, substitute `<YYYY-MM-DD>`, and
+write (or overwrite) `.agents/team-comms.md`.
 
 **Every generated file must start with the line:**
 
@@ -61,49 +61,38 @@ This header is non-negotiable — it marks the file as scout-owned so that
 future seeds know it is safe to overwrite, and so human readers don't
 hand-edit content that will be clobbered.
 
-Multi-host projects (e.g. both Claude Code and Copilot installed)
-concatenate the matching host templates into a single file, with a one-line
-note at the top telling each runtime which section applies.
-
 ---
 
-## 6.5d — Declare Copilot subagent capability (Copilot only)
+## 6.5d — Check Copilot agent frontmatter (Copilot only)
 
-This sub-step only runs when `have_copilot=1`.
+This sub-step only runs when `have_copilot=1`, and it **writes nothing new**.
 
-GitHub Copilot requires every agent that spawns subagents to declare the
-capability in its YAML frontmatter. For each installed Copilot agent file
-(under `.github/agents/`), add or update two fields:
+Custom agents are invocable by the model by default on every Copilot engine
+through its own subagent tool; the agent sees that tool in its tool list. No
+capability declaration exists or is needed, and the template deliberately
+names no tool — the model already knows its host's.
 
-```yaml
-tools: ['agent', ...existing tools...]   # add 'agent' if missing
-agents: ['<every-other-installed-agent-name>']  # whitelist
-```
+What scout does check, per file under `.github/agents/`:
 
-The `agents:` list contains every other installed persona except the agent
-itself, by the Copilot name in the file's frontmatter. Safe default: "all
-others." If scout has reason to narrow the whitelist for a specific
-persona, narrow explicitly and document inline.
+- **A `tools:` key must not be present.** On the CLI `tools:` is an
+  allow-list (absent = all tools); an earlier seed wrote `tools: ['agent']`,
+  which strips read, edit and execute. Remove the key if a previous seed
+  added it, and say so in the summary.
+- **An `agents:` key is optional and VS-Code-only.** It narrows which
+  subagents the agent may call there; the CLI ignores it. Leave it out
+  unless the project deliberately wants a narrower roster.
+- Do not touch any other YAML key.
 
-Include `shared/agents/` helpers (e.g. `issue-reproducer`,
-`rca-investigator`) in the whitelist **only if they were actually installed
-as Copilot agents** in this project — do not add placeholders for helpers
-that are not present.
+**Claude-flavoured AGENT.md files need nothing either** — Claude Code
+resolves subagent targets by directory name at call time.
 
-**Claude-flavoured AGENT.md files need no `tools` / `agents` fields** —
-Claude Code resolves subagent targets by directory name at call time and
-ignores these fields if present. Safe to leave them in a shared file.
-
-**`handoffs:` vs. the `agent` tool (Copilot).** `handoffs:` frontmatter
-renders as user-clickable buttons for post-run navigation. The `agent`
-tool is for programmatic mid-run delegation. Scout wires the `agent` tool;
-`handoffs:` is out of scope for this step.
+**`handoffs:` vs. a dispatch (Copilot).** `handoffs:` frontmatter renders as
+user-clickable buttons for post-run navigation; a dispatch is a `task` /
+`runSubagent` tool call mid-run. Scout wires neither.
 
 If `have_cursor=1` or `have_windsurf=1`, check the current custom-agent
-docs for those hosts and apply the equivalent capability declaration. If
-no declaration is documented, note the gap in your scout report.
-
----
+docs for those hosts and record their dispatch tool in the host section of
+`team-comms.md`.
 
 ## 6.5e — Add the `team-comms.md` reference to agent "Project Context"
 
@@ -128,9 +117,8 @@ Re-running scout on an already-seeded project must be safe:
 
 - `.agents/team-comms.md` is fully overwritten on each seed. The header
   line above is how readers (and scout) know that's intentional.
-- Frontmatter edits (Copilot `tools:` / `agents:` fields) are applied only
-  if the fields are missing or differ from the desired value; leave other
-  YAML keys alone.
+- Copilot frontmatter is only ever *cleaned* (a stray `tools:` key removed);
+  nothing is added; leave other YAML keys alone.
 - The "Project Context" one-liner is added only if missing — never
   duplicated.
 - Never touch anything outside what this step specifies.

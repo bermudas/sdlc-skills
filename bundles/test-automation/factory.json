@@ -38,6 +38,7 @@
   "hooks": "hooks/hooks.json",
   "instructions": "instructions.md",
   "targets": [
-    "claude"
+    "claude",
+    "copilot"
   ]
 }

@@ -14,6 +14,7 @@ they re-fire on `clear`/`compact`/`resume`, and they run on every runtime.
 | `.agents/memory/<role>/snapshot.md` | `agent-start` | per agent, every dispatch |
 | Lean shared docs: `role-overrides.md`, `profile.md`, `workflow.md`, `testing.md`, `conventions.md`, `team-comms.md` | `session-start` (parent session) **and** `agent-start` (each subagent) | per session / per dispatch; re-injected on clear/compact |
 | Roster reminder → `memory` skill | `session-start` | only on Cursor & Kiro (no context-injecting per-agent hook) |
+| Install locations — absolute `<project>/<hostdir>/skills/<id>/`, `agents/`, `.agents/` (every host dir present, plus a plugin root) and "never search `/` or `~`" | `session-start` (`--agent` sessions) **and** `agent-start` | role-bearing sessions and every dispatch; ~300 bytes inside the cap. Why: agents hunted for their own libraries with `find /` / `ls ~/.claude/skills` (ta-bench, 2026-09-23) — a body rule did not stop the first reflex, an absolute path in context does |
 
 A dispatched subagent gets a fresh context that does **not** inherit the parent's
 `SessionStart` injection, so `agent-start` delivers the shared docs to each
@@ -74,7 +75,7 @@ relied on, so the hooks are safe on an unseeded project.
 |---|---|---|---|---|
 | **Claude Code** | ✅ `SubagentStart` (`agent_name`) → `agent-start` | ✅ `SessionStart` → `session-start` | ✅ (`startup\|clear\|compact\|resume`) | auto: `hooks/hooks.json` at plugin root |
 | **Codex** | ✅ `SubagentStart` (`agent_type`), same shape as CC | ✅ `SessionStart` | ✅ (`startup\|resume\|clear\|compact`) | `~/.codex/hooks.json` or `<repo>/.codex/hooks.json` |
-| **Copilot CLI** | ✅ `subagentStart` (`agentName`) → `agent-start` | ✅ `sessionStart` (v1.0.11+ honours `additionalContext`) | ✅ on resume | `.github/hooks/*.json` or `~/.copilot/hooks/` |
+| **Copilot CLI** | ✅ `subagentStart` (`agentName`) → `agent-start` | ✅ `sessionStart` (v1.0.11+ honours `additionalContext`) | ✅ on resume | `.github/hooks/*.json` or `~/.copilot/hooks/` — **in `-p` mode repo hooks load only for a trusted folder or with `GITHUB_COPILOT_PROMPT_MODE_REPO_HOOKS=true` / `COPILOT_ALLOW_ALL=true`** (1.0.88; flags do not count, the skip is silent) |
 | **Cursor** | ❌ `subagentStart` is permission-only (no context inject; generic `subagent_type`) → roster reminder + `memory` skill | ✅ `sessionStart` | ✅ (`sessionStart` re-fires; `preCompact` exists) | `.cursor/hooks.json` |
 | **Kiro** | ⚠️ `agentSpawn` carries no agent name → per-agent config passes the role explicitly | ✅ via `agentSpawn` (raw stdout) | n/a (per-spawn) | inside each custom-agent config `hooks` field |
 
@@ -95,6 +96,18 @@ scheme superpowers uses), so one script serves every runtime:
 - `PLUGIN_ROOT` set or `CODEX_HOOK=1` → `{ "hookSpecificOutput": { "hookEventName": ..., "additionalContext": ... } }` (Codex; same shape as CC)
 - `CLAUDE_PLUGIN_ROOT` (plugin path) **or** `CLAUDE_PROJECT_DIR` (the `npx … init` project install) set, and `COPILOT_CLI` unset → `{ "hookSpecificOutput": ... }` (Claude Code)
 - `COPILOT_CLI=1` → `{ "additionalContext": ... }` (SDK standard)
+- `COPILOT_CLI=1` **but** the stdin payload carries `hook_event_name` → the
+  `hookSpecificOutput` shape. VS Code's native chat loop runs the same
+  `.github/hooks` entries as the Copilot CLI (it maps `sessionStart` →
+  `SessionStart` itself) yet reads only the Claude shape; the CLI's payload is
+  camelCase (`sessionId`, `agentName`) and never has that field, so the payload
+  tells the two engines apart where the flag cannot (`apply_payload_dialect`).
+  VS Code (1.137) gates workspace hooks on **Workspace Trust**: in Restricted
+  Mode every `.github/hooks` file is skipped (reason `workspace-untrusted`,
+  visible only in the Chat customizations view — no prompt in chat), and
+  `chat.useHooks` (default on) or the `chat.hooks.allowManagedOnly` policy can
+  turn them off entirely. Hook files themselves sit on the edit auto-approve
+  exclusion list, so an agent editing `.github/hooks/**` always asks.
 
 `agent-start` emits the `SubagentStart`/`hookSpecificOutput` variant on Claude
 Code and Codex, the top-level `additionalContext` variant on Copilot CLI, and raw
